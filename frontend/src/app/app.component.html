@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<div class="app-container">
+  <header class="header">
+    <h1>{{ title }}</h1>
+    <div class="stats" *ngIf="wordStats">
+      <div class="stat-item">
+        <span class="stat-label">Total Words:</span>
+        <span class="stat-value">{{ wordStats.total_words }}</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">Length Range:</span>
+        <span class="stat-value">{{ wordStats.min_length }} - {{ wordStats.max_length }}</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">Avg Length:</span>
+        <span class="stat-value">{{ wordStats.avg_length }}</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="main-content">
+    <div class="left-panel">
+      <div class="tabs">
+        <button 
+          class="tab-button" 
+          [class.active]="activeTab === 'filter'"
+          (click)="setActiveTab('filter')">
+          Filter Words
+        </button>
+        <button 
+          class="tab-button" 
+          [class.active]="activeTab === 'interactive'"
+          (click)="setActiveTab('interactive')">
+          Interactive
+        </button>
+      </div>
+    </div>
+
+    <div class="content-panel">
+      
+      <!-- Filter Words Tab -->
+      <div class="tab-content" [class.active]="activeTab === 'filter'">
+        <form [formGroup]="filterForm" class="filter-form">
+          <div class="filter-section">
+            <h3>Filter Words</h3>
+            
+            <div class="form-row">
+              <div class="form-group">
+                <label for="contains">Contains Letters:</label>
+                <input 
+                  type="text" 
+                  id="contains"
+                  formControlName="contains"
+                  (input)="onFilterChange()"
+                  placeholder="e.g., 'app'"
+                  class="form-control">
+              </div>
+              
+              <div class="form-group">
+                <label for="starts_with">Starts With:</label>
+                <input 
+                  type="text" 
+                  id="starts_with"
+                  formControlName="starts_with"
+                  (input)="onFilterChange()"
+                  placeholder="e.g., 'a'"
+                  class="form-control">
+              </div>
+              
+              <div class="form-group">
+                <label for="ends_with">Ends With:</label>
+                <input 
+                  type="text" 
+                  id="ends_with"
+                  formControlName="ends_with"
+                  (input)="onFilterChange()"
+                  placeholder="e.g., 'e'"
+                  class="form-control">
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label for="exact_length">Exact Length:</label>
+                <input 
+                  type="number" 
+                  id="exact_length"
+                  formControlName="exact_length"
+                  (input)="onFilterChange()"
+                  min="1"
+                  class="form-control">
+              </div>
+              
+              <div class="form-group">
+                <label for="min_length">Min Length:</label>
+                <input 
+                  type="number" 
+                  id="min_length"
+                  formControlName="min_length"
+                  (input)="onFilterChange()"
+                  min="1"
+                  class="form-control">
+              </div>
+              
+              <div class="form-group">
+                <label for="max_length">Max Length:</label>
+                <input 
+                  type="number" 
+                  id="max_length"
+                  formControlName="max_length"
+                  (input)="onFilterChange()"
+                  min="1"
+                  class="form-control">
+              </div>
+              
+              <div class="form-group">
+                <label for="limit">Max Results:</label>
+                <input 
+                  type="number" 
+                  id="limit"
+                  formControlName="limit"
+                  (input)="onFilterChange()"
+                  min="1"
+                  max="1000"
+                  class="form-control">
+              </div>
+            </div>
+
+            <div class="form-actions">
+              <button type="button" (click)="searchWords()" class="btn btn-primary">
+                Search Words
+              </button>
+              <button type="button" (click)="clearFilters()" class="btn btn-secondary">
+                Clear Filters
+              </button>
+            </div>
+          </div>
+        </form>
+
+        <div class="results-section">
+          <div class="results-header">
+            <h3>Results</h3>
+            <span class="result-count" *ngIf="!loading">{{ words.length }} words found</span>
+          </div>
+
+          <div class="loading" *ngIf="loading">
+            <div class="spinner"></div>
+            <span>Searching words...</span>
+          </div>
+
+          <div class="error" *ngIf="error">
+            <i class="error-icon">⚠️</i>
+            <span>{{ error }}</span>
+          </div>
+
+          <div class="words-grid" *ngIf="!loading && !error && words.length > 0">
+            <div class="word-item" *ngFor="let word of words">
+              {{ word }}
+              <span class="word-length">({{ word.length }})</span>
+            </div>
+          </div>
+
+          <div class="no-results" *ngIf="!loading && !error && words.length === 0">
+            <i class="no-results-icon">🔍</i>
+            <p>No words match your filters</p>
+            <small>Try adjusting your search criteria</small>
+          </div>
+        </div>
+      </div>
+
+      <!-- Interactive Tab -->
+      <div class="tab-content" [class.active]="activeTab === 'interactive'">
+        <div class="interactive-section">
+          <h3>Interactive Word Puzzle</h3>
+          
+          <div class="word-length-section">
+            <label for="wordLength">Expected Word Length:</label>
+            <input 
+              type="number" 
+              id="wordLength"
+              [(ngModel)]="interactiveWordLength"
+              (input)="onWordLengthChange()"
+              min="2"
+              max="20"
+              placeholder="Enter word length (e.g., 4)"
+              class="form-control word-length-input">
+          </div>
+
+          <div class="letter-boxes-section" *ngIf="letterBoxes.length > 0">
+            <h4>Fill in the letters you know:</h4>
+            <div class="letter-boxes">
+              <div class="letter-box" *ngFor="let box of letterBoxes; let i = index; trackBy: trackByIndex">
+                <label>{{ i + 1 }}</label>
+                <input 
+                  type="text" 
+                  maxlength="1"
+                  class="letter-input"
+                  [value]="letterBoxes[i] ? letterBoxes[i].toUpperCase() : ''"
+                  (input)="updateLetter(i, $event)"
+                  placeholder="?">
+              </div>
+            </div>
+
+            <div class="interactive-actions">
+              <button type="button" (click)="findMatchingWords()" class="btn btn-primary">
+                Find Words
+              </button>
+              <button type="button" (click)="clearInteractive()" class="btn btn-secondary">
+                Clear All
+              </button>
+            </div>
+          </div>
+
+          <div class="interactive-results" *ngIf="interactiveWords.length > 0">
+            <div class="results-header">
+              <h4>Possible Words</h4>
+              <span class="result-count">{{ interactiveWords.length }} matches found</span>
+            </div>
+            <div class="words-grid">
+              <div class="word-item interactive-word" *ngFor="let word of interactiveWords">
+                {{ word }}
+                <span class="word-length">({{ word.length }})</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="interactive-loading" *ngIf="interactiveLoading">
+            <div class="spinner"></div>
+            <span>Finding matching words...</span>
+          </div>
+
+          <div class="interactive-error" *ngIf="interactiveError">
+            <i class="error-icon">⚠️</i>
+            <span>{{ interactiveError }}</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>

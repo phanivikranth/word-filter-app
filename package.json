@@ -1,0 +1,31 @@
+{
+  "name": "word-filter-app",
+  "version": "1.0.0",
+  "description": "A full-stack word filtering and puzzle solving application",
+  "main": "index.js",
+  "scripts": {
+    "setup": "cd backend && python -m venv venv && venv\\Scripts\\activate && pip install -r requirements.txt && cd ../frontend && npm install",
+    "start-backend": "cd backend && venv\\Scripts\\activate && python main.py",
+    "start-frontend": "cd frontend && npm start",
+    "dev": "echo 'Run npm run start-backend and npm run start-frontend in separate terminals'"
+  },
+  "keywords": [
+    "word-filter",
+    "puzzle-solver",
+    "fastapi",
+    "angular",
+    "fullstack",
+    "crossword",
+    "word-game"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/YOUR_USERNAME/word-filter-app.git"
+  },
+  "engines": {
+    "node": ">=14.0.0",
+    "python": ">=3.8.0"
+  }
+}

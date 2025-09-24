@@ -1,0 +1,162 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: word-filter-backend
+  namespace: word-filter-app
+  labels:
+    app: word-filter-backend
+    component: api
+    version: s3
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: word-filter-backend
+  template:
+    metadata:
+      labels:
+        app: word-filter-backend
+        component: api
+        version: s3
+    spec:
+      containers:
+      - name: backend
+        image: your-account.dkr.ecr.us-west-2.amazonaws.com/word-filter-backend:latest
+        ports:
+        - containerPort: 8001
+          name: http
+        
+        # Environment variables for S3 integration
+        env:
+        - name: PORT
+          value: "8001"
+        - name: HOST
+          value: "0.0.0.0"
+        
+        # S3 Configuration from ConfigMap
+        - name: WORDS_S3_BUCKET
+          valueFrom:
+            configMapKeyRef:
+              name: word-filter-config
+              key: WORDS_S3_BUCKET
+        - name: WORDS_S3_KEY
+          valueFrom:
+            configMapKeyRef:
+              name: word-filter-config
+              key: WORDS_S3_KEY
+        - name: AWS_REGION
+          valueFrom:
+            configMapKeyRef:
+              name: word-filter-config
+              key: AWS_REGION
+        
+        # AWS Credentials from Secret
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: word-filter-aws-credentials
+              key: AWS_ACCESS_KEY_ID
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: word-filter-aws-credentials
+              key: AWS_SECRET_ACCESS_KEY
+        
+        # Application Configuration
+        - name: CORS_ORIGINS
+          valueFrom:
+            configMapKeyRef:
+              name: word-filter-config
+              key: CORS_ORIGINS
+        - name: LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: word-filter-config
+              key: LOG_LEVEL
+        
+        # Resource limits for cost optimization
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        
+        # Health checks
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8001
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8001
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        
+        # Startup probe for S3 initialization
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 8001
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 10  # Allow more time for S3 setup
+      
+      # Service account for AWS IAM roles (optional - better than hardcoded credentials)
+      serviceAccountName: word-filter-backend
+      
+      # Restart policy
+      restartPolicy: Always
+      
+      # Security context
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: word-filter-backend
+  namespace: word-filter-app
+  labels:
+    app: word-filter-backend
+    component: api
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8001
+    targetPort: 8001
+    protocol: TCP
+    name: http
+  selector:
+    app: word-filter-backend
+
+---
+# Service Account for IAM roles (recommended approach)
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: word-filter-backend
+  namespace: word-filter-app
+  labels:
+    app: word-filter-backend
+  annotations:
+    # If using AWS IAM roles for service accounts (IRSA)
+    # eks.amazonaws.com/role-arn: arn:aws:iam::YOUR-ACCOUNT:role/WordFilterS3Role

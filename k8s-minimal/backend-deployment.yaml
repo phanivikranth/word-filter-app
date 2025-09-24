@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: word-filter-backend
+  namespace: word-filter-test
+  labels:
+    app: word-filter-backend
+spec:
+  replicas: 1  # Minimal: just 1 replica
+  selector:
+    matchLabels:
+      app: word-filter-backend
+  template:
+    metadata:
+      labels:
+        app: word-filter-backend
+    spec:
+      containers:
+      - name: backend
+        image: your-account.dkr.ecr.us-west-2.amazonaws.com/word-filter-backend:latest
+        ports:
+        - containerPort: 8001
+        # Minimal resources for testing
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
+        # Simple health check
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8001
+          initialDelaySeconds: 10
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8001
+          initialDelaySeconds: 5
+          periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: word-filter-backend
+  namespace: word-filter-test
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8001
+    targetPort: 8001
+  selector:
+    app: word-filter-backend

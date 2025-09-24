@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: word-filter-config
+  namespace: word-filter-app
+  labels:
+    app: word-filter
+    component: config
+data:
+  # S3 Configuration
+  WORDS_S3_BUCKET: "word-filter-storage"
+  WORDS_S3_KEY: "words/words.txt"
+  AWS_REGION: "us-west-2"
+  
+  # Application Configuration
+  CORS_ORIGINS: "*"  # Set to your domain in production
+  LOG_LEVEL: "INFO"
+  MAX_WORD_LENGTH: "50"
+  MAX_RESULTS_LIMIT: "1000"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: word-filter-aws-credentials
+  namespace: word-filter-app
+  labels:
+    app: word-filter
+    component: secrets
+type: Opaque
+data:
+  # Base64 encoded AWS credentials
+  # Replace these with your actual base64-encoded credentials
+  # To encode: echo -n "your-access-key" | base64
+  AWS_ACCESS_KEY_ID: "eW91ci1hY2Nlc3Mta2V5LWlkLWhlcmU="  # Placeholder
+  AWS_SECRET_ACCESS_KEY: "eW91ci1zZWNyZXQtYWNjZXNzLWtleS1oZXJl"  # Placeholder

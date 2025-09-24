@@ -1,0 +1,64 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: word-filter-ingress
+  namespace: word-filter-app
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+    nginx.ingress.kubernetes.io/proxy-body-size: "1m"
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "*"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "Content-Type, Authorization"
+spec:
+  tls:
+  - hosts:
+    - word-filter.yourdomain.com
+    secretName: word-filter-tls
+  rules:
+  - host: word-filter.yourdomain.com
+    http:
+      paths:
+      # API routes
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: word-filter-backend
+            port:
+              number: 8001
+      - path: /words
+        pathType: Prefix
+        backend:
+          service:
+            name: word-filter-backend
+            port:
+              number: 8001
+      - path: /docs
+        pathType: Prefix
+        backend:
+          service:
+            name: word-filter-backend
+            port:
+              number: 8001
+      - path: /openapi.json
+        pathType: Prefix
+        backend:
+          service:
+            name: word-filter-backend
+            port:
+              number: 8001
+      # Frontend routes (catch-all)
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: word-filter-frontend
+            port:
+              number: 80

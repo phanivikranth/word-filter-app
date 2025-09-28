@@ -1,0 +1,410 @@
+name: Deploy to Civo
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - development
+          - staging
+          - production
+      deployment_type:
+        description: 'Deployment type'
+        required: true
+        default: 'full'
+        type: choice
+        options:
+          - minimal
+          - full
+          - objectstore
+      civo_region:
+        description: 'Civo region'
+        required: true
+        default: 'LON1'
+        type: choice
+        options:
+          - LON1
+          - NYC1
+          - FRA1
+      dry_run:
+        description: 'Dry run (no actual deployment)'
+        required: false
+        default: false
+        type: boolean
+      force_deploy:
+        description: 'Force deployment without confirmation'
+        required: false
+        default: false
+        type: boolean
+        
+  push:
+    branches:
+      - main
+    paths:
+      - 'civo-terraform/**'
+      - 'civo-k8s/**'
+      - 'backend/main_civo.py'
+      - 'backend/word_manager_civo.py'
+      - '.github/workflows/deploy-civo.yml'
+
+env:
+  TERRAFORM_VERSION: '1.6.0'
+  CIVO_CLI_VERSION: '1.0.0'
+
+jobs:
+  # Validate Civo deployment configuration
+  validate:
+    runs-on: ubuntu-latest
+    name: Validate Civo Configuration
+    
+    outputs:
+      environment: ${{ steps.setup.outputs.environment }}
+      deployment_type: ${{ steps.setup.outputs.deployment_type }}
+      civo_region: ${{ steps.setup.outputs.civo_region }}
+      cluster_name: ${{ steps.setup.outputs.cluster_name }}
+      
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup deployment parameters
+      id: setup
+      run: |
+        # Set environment based on trigger
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          ENV="${{ github.event.inputs.environment }}"
+          TYPE="${{ github.event.inputs.deployment_type }}"
+          REGION="${{ github.event.inputs.civo_region }}"
+          DRY_RUN="${{ github.event.inputs.dry_run }}"
+        else
+          # Automatic deployment from push
+          ENV="staging"
+          TYPE="full"
+          REGION="LON1"
+          DRY_RUN="false"
+        fi
+        
+        CLUSTER_NAME="word-filter-civo-${ENV}"
+        
+        echo "environment=$ENV" >> $GITHUB_OUTPUT
+        echo "deployment_type=$TYPE" >> $GITHUB_OUTPUT
+        echo "civo_region=$REGION" >> $GITHUB_OUTPUT
+        echo "cluster_name=$CLUSTER_NAME" >> $GITHUB_OUTPUT
+        echo "dry_run=$DRY_RUN" >> $GITHUB_OUTPUT
+        
+        echo "🚀 Deployment Configuration:"
+        echo "- Environment: $ENV"
+        echo "- Type: $TYPE"
+        echo "- Region: $REGION"
+        echo "- Cluster: $CLUSTER_NAME"
+        echo "- Dry Run: $DRY_RUN"
+        
+    - name: Install Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ${{ env.TERRAFORM_VERSION }}
+        
+    - name: Validate Terraform configurations
+      run: |
+        # Validate full terraform
+        if [ "${{ steps.setup.outputs.deployment_type }}" != "minimal" ]; then
+          cd civo-terraform
+          terraform init -backend=false
+          terraform validate
+          cd ..
+        fi
+        
+        # Validate minimal terraform
+        cd civo-terraform-minimal
+        terraform init -backend=false
+        terraform validate
+        cd ..
+        
+    - name: Validate Kubernetes manifests
+      run: |
+        # Install kubeval for validation
+        wget https://github.com/instrumenta/kubeval/releases/latest/download/kubeval-linux-amd64.tar.gz
+        tar xf kubeval-linux-amd64.tar.gz
+        sudo mv kubeval /usr/local/bin
+        
+        # Validate manifests
+        DIRS=("civo-k8s" "civo-k8s-minimal" "civo-k8s-objectstore")
+        
+        for dir in "${DIRS[@]}"; do
+          if [ -d "$dir" ]; then
+            echo "Validating $dir..."
+            find "$dir" -name "*.yaml" -exec kubeval {} \;
+          fi
+        done
+
+  # Deploy infrastructure with Terraform
+  terraform-deploy:
+    needs: validate
+    runs-on: ubuntu-latest
+    name: Deploy Civo Infrastructure
+    if: ${{ github.event.inputs.dry_run != 'true' }}
+    
+    environment: 
+      name: civo-${{ needs.validate.outputs.environment }}
+      url: ${{ steps.terraform.outputs.cluster_endpoint }}
+    
+    outputs:
+      cluster_endpoint: ${{ steps.terraform.outputs.cluster_endpoint }}
+      cluster_id: ${{ steps.terraform.outputs.cluster_id }}
+      kubeconfig: ${{ steps.terraform.outputs.kubeconfig }}
+      object_store_endpoint: ${{ steps.terraform.outputs.object_store_endpoint }}
+      
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Install Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ${{ env.TERRAFORM_VERSION }}
+        terraform_wrapper: false
+        
+    - name: Install Civo CLI
+      run: |
+        curl -sL https://github.com/civo/cli/releases/download/v${{ env.CIVO_CLI_VERSION }}/civo-${{ env.CIVO_CLI_VERSION }}-linux-amd64.tar.gz | tar xz
+        sudo mv civo /usr/local/bin/
+        civo version
+        
+    - name: Configure Civo CLI
+      run: |
+        civo apikey save github-actions ${{ secrets.CIVO_API_KEY }}
+        civo apikey current
+        
+    - name: Select Terraform directory
+      id: terraform_dir
+      run: |
+        if [ "${{ needs.validate.outputs.deployment_type }}" = "minimal" ]; then
+          echo "dir=civo-terraform-minimal" >> $GITHUB_OUTPUT
+        else
+          echo "dir=civo-terraform" >> $GITHUB_OUTPUT
+        fi
+        
+    - name: Setup Terraform backend
+      run: |
+        cd ${{ steps.terraform_dir.outputs.dir }}
+        
+        # Create backend configuration
+        cat > backend.tf << EOF
+        terraform {
+          backend "remote" {
+            hostname = "app.terraform.io"
+            organization = "${{ secrets.TERRAFORM_ORGANIZATION }}"
+            
+            workspaces {
+              name = "word-filter-civo-${{ needs.validate.outputs.environment }}"
+            }
+          }
+        }
+        EOF
+        
+    - name: Terraform Init
+      run: |
+        cd ${{ steps.terraform_dir.outputs.dir }}
+        terraform init
+        
+    - name: Terraform Plan
+      id: plan
+      run: |
+        cd ${{ steps.terraform_dir.outputs.dir }}
+        terraform plan \
+          -var "cluster_name=${{ needs.validate.outputs.cluster_name }}" \
+          -var "civo_region=${{ needs.validate.outputs.civo_region }}" \
+          -var "environment=${{ needs.validate.outputs.environment }}" \
+          -out=tfplan
+          
+    - name: Terraform Apply
+      id: terraform
+      if: ${{ github.event.inputs.force_deploy == 'true' || github.event_name == 'push' }}
+      run: |
+        cd ${{ steps.terraform_dir.outputs.dir }}
+        terraform apply -auto-approve tfplan
+        
+        # Get outputs
+        echo "cluster_endpoint=$(terraform output -raw cluster_endpoint)" >> $GITHUB_OUTPUT
+        echo "cluster_id=$(terraform output -raw cluster_id)" >> $GITHUB_OUTPUT  
+        echo "kubeconfig=$(terraform output -raw kubeconfig)" >> $GITHUB_OUTPUT
+        
+        if terraform output object_store_endpoint >/dev/null 2>&1; then
+          echo "object_store_endpoint=$(terraform output -raw object_store_endpoint)" >> $GITHUB_OUTPUT
+        fi
+        
+    - name: Save kubeconfig
+      if: steps.terraform.outputs.kubeconfig
+      run: |
+        mkdir -p ~/.kube
+        echo '${{ steps.terraform.outputs.kubeconfig }}' | base64 -d > ~/.kube/config
+        
+        # Test connection
+        kubectl get nodes
+        
+    - name: Upload Terraform state
+      uses: actions/upload-artifact@v3
+      if: steps.terraform.conclusion == 'success'
+      with:
+        name: terraform-state-civo-${{ needs.validate.outputs.environment }}
+        path: |
+          ${{ steps.terraform_dir.outputs.dir }}/*.tfstate*
+          ${{ steps.terraform_dir.outputs.dir }}/.terraform/
+        retention-days: 30
+
+  # Deploy application to Kubernetes
+  k8s-deploy:
+    needs: [validate, terraform-deploy]
+    runs-on: ubuntu-latest
+    name: Deploy to Civo Kubernetes
+    if: ${{ github.event.inputs.dry_run != 'true' && needs.terraform-deploy.outputs.cluster_endpoint }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup kubectl
+      uses: azure/setup-kubectl@v3
+      
+    - name: Configure kubeconfig
+      run: |
+        mkdir -p ~/.kube
+        echo '${{ needs.terraform-deploy.outputs.kubeconfig }}' | base64 -d > ~/.kube/config
+        kubectl cluster-info
+        
+    - name: Wait for cluster ready
+      run: |
+        echo "Waiting for cluster to be ready..."
+        timeout 300 bash -c 'until kubectl get nodes | grep Ready; do sleep 10; done'
+        kubectl get nodes
+        
+    - name: Select K8s directory
+      id: k8s_dir
+      run: |
+        case "${{ needs.validate.outputs.deployment_type }}" in
+          minimal) echo "dir=civo-k8s-minimal" >> $GITHUB_OUTPUT ;;
+          objectstore) echo "dir=civo-k8s-objectstore" >> $GITHUB_OUTPUT ;;
+          *) echo "dir=civo-k8s" >> $GITHUB_OUTPUT ;;
+        esac
+        
+    - name: Deploy namespace
+      run: |
+        kubectl apply -f ${{ steps.k8s_dir.outputs.dir }}/namespace.yaml
+        
+    - name: Deploy ConfigMap
+      run: |
+        if [ -f "${{ steps.k8s_dir.outputs.dir }}/configmap.yaml" ]; then
+          # Update ConfigMap with actual values
+          cp ${{ steps.k8s_dir.outputs.dir }}/configmap.yaml configmap-updated.yaml
+          
+          if [ "${{ needs.terraform-deploy.outputs.object_store_endpoint }}" ]; then
+            sed -i "s|ENDPOINT_URL: \"\"|ENDPOINT_URL: \"${{ needs.terraform-deploy.outputs.object_store_endpoint }}\"|g" configmap-updated.yaml
+          fi
+          
+          kubectl apply -f configmap-updated.yaml
+        fi
+        
+    - name: Create secrets (if needed)
+      if: ${{ needs.validate.outputs.deployment_type == 'objectstore' }}
+      run: |
+        # Create object store credentials secret
+        kubectl create secret generic civo-objectstore-credentials \
+          --from-literal=ACCESS_KEY_ID="${{ secrets.CIVO_OBJECT_STORE_ACCESS_KEY }}" \
+          --from-literal=SECRET_ACCESS_KEY="${{ secrets.CIVO_OBJECT_STORE_SECRET_KEY }}" \
+          -n word-filter-app \
+          --dry-run=client -o yaml | kubectl apply -f -
+          
+    - name: Deploy application
+      run: |
+        # Deploy all manifests except namespace and configmap
+        find ${{ steps.k8s_dir.outputs.dir }} -name "*.yaml" \
+          ! -name "namespace.yaml" \
+          ! -name "configmap.yaml" \
+          -exec kubectl apply -f {} \;
+          
+    - name: Wait for deployment
+      run: |
+        echo "Waiting for deployments to be ready..."
+        kubectl wait --for=condition=ready pod -l app=word-filter-backend -n word-filter-app --timeout=300s
+        kubectl wait --for=condition=ready pod -l app=word-filter-frontend -n word-filter-app --timeout=300s
+        
+    - name: Get deployment status
+      run: |
+        echo "=== Deployment Status ==="
+        kubectl get pods -n word-filter-app
+        kubectl get services -n word-filter-app
+        kubectl get ingress -n word-filter-app 2>/dev/null || true
+        
+        echo "=== Service URLs ==="
+        kubectl get services -n word-filter-app -o json | \
+          jq -r '.items[] | select(.spec.type == "LoadBalancer") | "\(.metadata.name): http://\(.status.loadBalancer.ingress[0].ip // "pending")"'
+          
+    - name: Run health checks
+      run: |
+        # Get backend service IP
+        BACKEND_IP=$(kubectl get service word-filter-backend -n word-filter-app -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+        
+        if [ -n "$BACKEND_IP" ] && [ "$BACKEND_IP" != "null" ]; then
+          echo "Testing backend health at http://$BACKEND_IP:8001"
+          
+          # Wait for service to be ready
+          timeout 120 bash -c "until curl -f http://$BACKEND_IP:8001/health; do sleep 10; done"
+          
+          # Test endpoints
+          curl -f http://$BACKEND_IP:8001/
+          curl -f http://$BACKEND_IP:8001/words/stats
+          
+          echo "✅ Backend health checks passed"
+        else
+          echo "⚠️ Backend LoadBalancer IP not available yet"
+        fi
+
+  # Notify deployment status
+  notify:
+    needs: [validate, terraform-deploy, k8s-deploy]
+    runs-on: ubuntu-latest
+    name: Notify Deployment Status
+    if: always()
+    
+    steps:
+    - name: Deployment Summary
+      run: |
+        echo "# 🚀 Civo Deployment Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Configuration:**" >> $GITHUB_STEP_SUMMARY
+        echo "- Environment: ${{ needs.validate.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
+        echo "- Deployment Type: ${{ needs.validate.outputs.deployment_type }}" >> $GITHUB_STEP_SUMMARY
+        echo "- Civo Region: ${{ needs.validate.outputs.civo_region }}" >> $GITHUB_STEP_SUMMARY
+        echo "- Cluster Name: ${{ needs.validate.outputs.cluster_name }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        echo "**Results:**" >> $GITHUB_STEP_SUMMARY
+        if [ "${{ needs.terraform-deploy.result }}" = "success" ]; then
+          echo "- ✅ Infrastructure: Deployed" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔗 Cluster Endpoint: ${{ needs.terraform-deploy.outputs.cluster_endpoint }}" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "- ❌ Infrastructure: Failed" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        if [ "${{ needs.k8s-deploy.result }}" = "success" ]; then
+          echo "- ✅ Application: Deployed" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "- ❌ Application: Failed" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Next Steps:**" >> $GITHUB_STEP_SUMMARY
+        echo "1. Configure kubectl: Download kubeconfig from job artifacts" >> $GITHUB_STEP_SUMMARY
+        echo "2. Check status: \`kubectl get pods -n word-filter-app\`" >> $GITHUB_STEP_SUMMARY
+        echo "3. Access app: Check LoadBalancer IPs in service output" >> $GITHUB_STEP_SUMMARY
+        
+    - name: Create deployment badge
+      if: needs.terraform-deploy.result == 'success' && needs.k8s-deploy.result == 'success'
+      run: |
+        echo "🎉 Civo deployment completed successfully!" 
+        echo "Environment: ${{ needs.validate.outputs.environment }}"
+        echo "Cluster: ${{ needs.validate.outputs.cluster_name }}"

@@ -1,0 +1,100 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: word-filter-frontend
+  namespace: word-filter-app
+  labels:
+    app: word-filter-frontend
+    component: web
+    cloud-provider: civo
+    environment: minimal
+spec:
+  replicas: 1  # Just 1 replica for testing
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: word-filter-frontend
+  template:
+    metadata:
+      labels:
+        app: word-filter-frontend
+        component: web
+        cloud-provider: civo
+        environment: minimal
+    spec:
+      containers:
+      - name: frontend
+        image: phanivikranth/word-filter-frontend:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 80
+          name: http
+        
+        # Environment variables
+        env:
+        - name: API_BASE_URL
+          value: "http://word-filter-backend:8001"
+        - name: ENVIRONMENT
+          value: "development"
+        
+        # Minimal resource requirements
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "25m"
+          limits:
+            memory: "256Mi"
+            cpu: "250m"
+        
+        # Basic health checks
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 20
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        
+        # Basic security
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          allowPrivilegeEscalation: false
+      
+      restartPolicy: Always
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: word-filter-frontend
+  namespace: word-filter-app
+  labels:
+    app: word-filter-frontend
+    component: web
+    cloud-provider: civo
+    environment: minimal
+spec:
+  type: NodePort  # Use NodePort for minimal setup
+  ports:
+  - port: 80
+    targetPort: 80
+    protocol: TCP
+    name: http
+    # nodePort will be automatically assigned (30000-32767)
+  selector:
+    app: word-filter-frontend

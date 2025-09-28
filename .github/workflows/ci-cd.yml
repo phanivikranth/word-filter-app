@@ -290,7 +290,7 @@ jobs:
       with:
         sarif_file: 'trivy-results.sarif'
         
-  # Deployment Job (only on main branch)
+  # Multi-Cloud Deployment Job (only on main branch)
   deploy:
     needs: [backend-test, frontend-test, build, docker-build, integration-test]
     runs-on: ubuntu-latest
@@ -298,22 +298,193 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     environment: production
     
+    strategy:
+      matrix:
+        cloud_provider: [aws, civo]
+        include:
+          - cloud_provider: aws
+            terraform_dir: terraform
+            k8s_dir: k8s
+            region_var: AWS_DEFAULT_REGION
+            region_default: us-west-2
+          - cloud_provider: civo
+            terraform_dir: civo-terraform
+            k8s_dir: civo-k8s
+            region_var: CIVO_REGION
+            region_default: LON1
+      fail-fast: false  # Continue with other providers if one fails
+    
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
       
-    - name: Deploy to production
+    - name: Setup cloud provider tools
       run: |
-        echo "🚀 Deploying to production..."
-        echo "Backend image: ${{ secrets.DOCKER_USERNAME }}/word-filter-backend:latest"
-        echo "Frontend image: ${{ secrets.DOCKER_USERNAME }}/word-filter-frontend:latest"
-        # Add your deployment logic here
-        # For example: kubectl apply -f k8s/
-        # Or: docker-compose up -d
-        # Or: trigger deployment webhook
+        case "${{ matrix.cloud_provider }}" in
+          aws)
+            # Install AWS CLI if not present
+            if ! command -v aws &> /dev/null; then
+              curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+              unzip awscliv2.zip
+              sudo ./aws/install
+            fi
+            
+            # Configure AWS credentials
+            aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+            aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+            aws configure set default.region ${{ env[matrix.region_var] || matrix.region_default }}
+            ;;
+            
+          civo)
+            # Install Civo CLI
+            curl -sL https://github.com/civo/cli/releases/download/v1.0.0/civo-1.0.0-linux-amd64.tar.gz | tar xz
+            sudo mv civo /usr/local/bin/
+            
+            # Configure Civo CLI
+            civo apikey save github-actions ${{ secrets.CIVO_API_KEY }}
+            ;;
+        esac
         
-    - name: Post deployment notification
+    - name: Install Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: 1.6.0
+        
+    - name: Setup kubectl
+      uses: azure/setup-kubectl@v3
+      
+    - name: Check if cloud deployment is enabled
+      id: check_enabled
       run: |
-        echo "✅ Deployment completed successfully!"
-        echo "Backend API: https://api.your-domain.com"
-        echo "Frontend App: https://app.your-domain.com"
+        case "${{ matrix.cloud_provider }}" in
+          aws)
+            if [ -n "${{ secrets.AWS_ACCESS_KEY_ID }}" ] && [ -n "${{ secrets.AWS_SECRET_ACCESS_KEY }}" ]; then
+              echo "enabled=true" >> $GITHUB_OUTPUT
+            else
+              echo "enabled=false" >> $GITHUB_OUTPUT
+              echo "⚠️ AWS credentials not configured, skipping AWS deployment"
+            fi
+            ;;
+          civo)
+            if [ -n "${{ secrets.CIVO_API_KEY }}" ]; then
+              echo "enabled=true" >> $GITHUB_OUTPUT
+            else
+              echo "enabled=false" >> $GITHUB_OUTPUT
+              echo "⚠️ Civo API key not configured, skipping Civo deployment"
+            fi
+            ;;
+        esac
+        
+    - name: Deploy infrastructure
+      if: steps.check_enabled.outputs.enabled == 'true'
+      run: |
+        cd ${{ matrix.terraform_dir }}
+        
+        # Initialize Terraform
+        terraform init
+        
+        # Plan deployment
+        terraform plan \
+          -var "cluster_name=word-filter-${{ matrix.cloud_provider }}-prod" \
+          -var "environment=production" \
+          -out=tfplan
+          
+        # Apply if auto-deployment is enabled
+        if [ "${{ secrets.AUTO_DEPLOY }}" = "true" ]; then
+          terraform apply -auto-approve tfplan
+          
+          # Save kubeconfig
+          terraform output -raw kubeconfig > ../kubeconfig-${{ matrix.cloud_provider }}.yaml
+        else
+          echo "Auto-deployment disabled. Manual approval required."
+        fi
+        
+    - name: Deploy application
+      if: steps.check_enabled.outputs.enabled == 'true' && secrets.AUTO_DEPLOY == 'true'
+      run: |
+        # Configure kubectl
+        export KUBECONFIG=kubeconfig-${{ matrix.cloud_provider }}.yaml
+        
+        # Wait for cluster to be ready
+        timeout 300 bash -c 'until kubectl get nodes | grep Ready; do sleep 10; done'
+        
+        # Deploy application
+        kubectl apply -f ${{ matrix.k8s_dir }}/
+        
+        # Wait for deployments
+        kubectl wait --for=condition=ready pod -l app=word-filter-backend -n word-filter-app --timeout=300s || true
+        kubectl wait --for=condition=ready pod -l app=word-filter-frontend -n word-filter-app --timeout=300s || true
+        
+        # Get service status
+        echo "=== ${{ matrix.cloud_provider }} Deployment Status ==="
+        kubectl get pods -n word-filter-app
+        kubectl get services -n word-filter-app
+        
+    - name: Run health checks
+      if: steps.check_enabled.outputs.enabled == 'true' && secrets.AUTO_DEPLOY == 'true'
+      run: |
+        export KUBECONFIG=kubeconfig-${{ matrix.cloud_provider }}.yaml
+        
+        # Get backend service endpoint
+        BACKEND_ENDPOINT=""
+        
+        case "${{ matrix.cloud_provider }}" in
+          aws)
+            BACKEND_ENDPOINT=$(kubectl get service word-filter-backend -n word-filter-app -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+            ;;
+          civo)
+            BACKEND_ENDPOINT=$(kubectl get service word-filter-backend -n word-filter-app -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+            ;;
+        esac
+        
+        if [ -n "$BACKEND_ENDPOINT" ] && [ "$BACKEND_ENDPOINT" != "null" ]; then
+          echo "Testing backend at http://$BACKEND_ENDPOINT:8001"
+          timeout 60 bash -c "until curl -f http://$BACKEND_ENDPOINT:8001/health; do sleep 10; done"
+          echo "✅ ${{ matrix.cloud_provider }} deployment health check passed"
+        else
+          echo "⚠️ ${{ matrix.cloud_provider }} backend endpoint not available yet"
+        fi
+        
+    - name: Upload deployment artifacts
+      if: steps.check_enabled.outputs.enabled == 'true'
+      uses: actions/upload-artifact@v3
+      with:
+        name: deployment-${{ matrix.cloud_provider }}
+        path: |
+          kubeconfig-${{ matrix.cloud_provider }}.yaml
+          ${{ matrix.terraform_dir }}/*.tfstate*
+        retention-days: 30
+        
+  # Post-deployment summary
+  deployment-summary:
+    needs: deploy
+    runs-on: ubuntu-latest
+    name: Deployment Summary
+    if: always() && github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    steps:
+    - name: Create deployment summary
+      run: |
+        echo "# 🚀 Multi-Cloud Deployment Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Deployment Results:**" >> $GITHUB_STEP_SUMMARY
+        
+        # Check AWS deployment
+        if [ "${{ needs.deploy.outputs.aws_status }}" ]; then
+          echo "- AWS: ${{ needs.deploy.outputs.aws_status }}" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        # Check Civo deployment
+        if [ "${{ needs.deploy.outputs.civo_status }}" ]; then
+          echo "- Civo: ${{ needs.deploy.outputs.civo_status }}" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Docker Images:**" >> $GITHUB_STEP_SUMMARY
+        echo "- Backend: ${{ secrets.DOCKER_USERNAME }}/word-filter-backend:latest" >> $GITHUB_STEP_SUMMARY
+        echo "- Frontend: ${{ secrets.DOCKER_USERNAME }}/word-filter-frontend:latest" >> $GITHUB_STEP_SUMMARY
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Access Information:**" >> $GITHUB_STEP_SUMMARY
+        echo "- Check deployment artifacts for kubeconfig files" >> $GITHUB_STEP_SUMMARY
+        echo "- Use kubectl with appropriate kubeconfig to check service endpoints" >> $GITHUB_STEP_SUMMARY

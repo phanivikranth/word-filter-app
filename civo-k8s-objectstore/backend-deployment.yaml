@@ -1,0 +1,289 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: word-filter-backend-objectstore
+  namespace: word-filter-app
+  labels:
+    app: word-filter-backend
+    component: api
+    cloud-provider: civo
+    version: objectstore
+    storage-type: civo-objectstore
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: word-filter-backend
+      version: objectstore
+  template:
+    metadata:
+      labels:
+        app: word-filter-backend
+        component: api
+        cloud-provider: civo
+        version: objectstore
+        storage-type: civo-objectstore
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8001"
+    spec:
+      containers:
+      - name: backend
+        image: phanivikranth/word-filter-backend:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8001
+          name: http
+        
+        # Environment variables for Civo Object Store integration
+        env:
+        - name: PORT
+          value: "8001"
+        - name: HOST
+          value: "0.0.0.0"
+        
+        # Storage Configuration - Use Civo Object Store
+        - name: USE_OBJECT_STORAGE
+          value: "true"
+        - name: STORAGE_TYPE
+          value: "civo"
+        - name: WORDS_S3_BUCKET
+          valueFrom:
+            configMapKeyRef:
+              name: civo-objectstore-config
+              key: BUCKET_NAME
+        - name: WORDS_S3_KEY
+          valueFrom:
+            configMapKeyRef:
+              name: civo-objectstore-config
+              key: WORDS_FILE_KEY
+        - name: S3_ENDPOINT
+          valueFrom:
+            configMapKeyRef:
+              name: civo-objectstore-config
+              key: ENDPOINT_URL
+        - name: S3_REGION
+          valueFrom:
+            configMapKeyRef:
+              name: civo-objectstore-config
+              key: REGION
+        
+        # Civo Object Store Credentials
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: civo-objectstore-credentials
+              key: ACCESS_KEY_ID
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: civo-objectstore-credentials
+              key: SECRET_ACCESS_KEY
+        
+        # Application Configuration
+        - name: ENVIRONMENT
+          value: "production"
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: CORS_ORIGINS
+          valueFrom:
+            configMapKeyRef:
+              name: civo-objectstore-config
+              key: CORS_ORIGINS
+        
+        # Civo-specific optimizations
+        - name: MAX_WORKERS
+          value: "4"
+        - name: WORKER_CLASS
+          value: "uvicorn.workers.UvicornWorker"
+        - name: KEEP_ALIVE
+          value: "2"
+        
+        # Cache configuration
+        - name: ENABLE_CACHING
+          value: "true"
+        - name: CACHE_TTL
+          value: "3600"
+        
+        # Performance settings
+        - name: MAX_REQUEST_SIZE
+          value: "10485760"  # 10MB
+        - name: TIMEOUT_KEEP_ALIVE
+          value: "5"
+        
+        # Resource limits optimized for Civo
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        
+        # Health checks with object store validation
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8001
+          initialDelaySeconds: 60  # Allow more time for object store setup
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8001
+          initialDelaySeconds: 30
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        
+        # Startup probe for object store initialization
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 8001
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 18  # Allow 3 minutes for startup
+        
+        # Security context
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          runAsGroup: 1000
+          readOnlyRootFilesystem: false  # Need write access for caching
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+        
+        # Volume mounts
+        volumeMounts:
+        - name: cache
+          mountPath: /app/cache
+        - name: tmp
+          mountPath: /tmp
+        - name: logs
+          mountPath: /app/logs
+      
+      # Service account
+      serviceAccountName: word-filter-backend-objectstore
+      
+      # Pod security context
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      
+      # Volumes
+      volumes:
+      - name: cache
+        emptyDir:
+          sizeLimit: 1Gi
+      - name: tmp
+        emptyDir:
+          sizeLimit: 500Mi
+      - name: logs
+        emptyDir:
+          sizeLimit: 500Mi
+      
+      # Restart policy
+      restartPolicy: Always
+      
+      # Node selection
+      nodeSelector:
+        kubernetes.io/arch: amd64
+      
+      # Pod anti-affinity for high availability
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - word-filter-backend
+              topologyKey: kubernetes.io/hostname
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: word-filter-backend-objectstore
+  namespace: word-filter-app
+  labels:
+    app: word-filter-backend
+    component: api
+    cloud-provider: civo
+    version: objectstore
+  annotations:
+    service.beta.kubernetes.io/civo-load-balancer-protocol: "http"
+    service.beta.kubernetes.io/civo-load-balancer-algorithm: "round_robin"
+    service.beta.kubernetes.io/civo-load-balancer-health-check-path: "/health"
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 8001
+    targetPort: 8001
+    protocol: TCP
+    name: http
+  selector:
+    app: word-filter-backend
+    version: objectstore
+  sessionAffinity: None
+
+---
+# Service Account with permissions for object store access
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: word-filter-backend-objectstore
+  namespace: word-filter-app
+  labels:
+    app: word-filter-backend
+    cloud-provider: civo
+    version: objectstore
+automountServiceAccountToken: true
+
+---
+# Role for accessing secrets and configmaps
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: word-filter-app
+  name: word-filter-backend-objectstore
+rules:
+- apiGroups: [""]
+  resources: ["configmaps", "secrets"]
+  verbs: ["get", "list"]
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list"]
+
+---
+# RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: word-filter-backend-objectstore
+  namespace: word-filter-app
+subjects:
+- kind: ServiceAccount
+  name: word-filter-backend-objectstore
+  namespace: word-filter-app
+roleRef:
+  kind: Role
+  name: word-filter-backend-objectstore
+  apiGroup: rbac.authorization.k8s.io

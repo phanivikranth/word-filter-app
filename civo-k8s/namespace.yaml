@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: word-filter-app
+  labels:
+    app: word-filter
+    managed-by: terraform
+    cloud-provider: civo
+    purpose: production
+  annotations:
+    description: "Word Filter Application - Civo Kubernetes Deployment"

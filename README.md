@@ -6,7 +6,9 @@
 [![Docker Backend](https://img.shields.io/docker/v/phanivikranth/word-filter-backend?label=backend%20image)](https://hub.docker.com/r/phanivikranth/word-filter-backend)
 [![Docker Frontend](https://img.shields.io/docker/v/phanivikranth/word-filter-frontend?label=frontend%20image)](https://hub.docker.com/r/phanivikranth/word-filter-frontend)
 
-A full-stack web application for filtering words and solving word puzzles, built with FastAPI backend and Angular frontend.
+A full-stack web application for filtering words and solving word puzzles, built with FastAPI backend and Angular frontend. 
+
+🌍 **Multi-Cloud Ready**: Deploy to AWS, Civo, or both simultaneously with full infrastructure automation and CI/CD support.
 
 ## Features
 
@@ -195,6 +197,40 @@ your_word_3
 
 Modify `frontend/src/app/app.component.css` and `frontend/src/styles.css` to customize the appearance.
 
+## 🌍 Multi-Cloud Deployment
+
+Deploy your Word Filter App to multiple cloud providers with full automation:
+
+### ☁️ Supported Cloud Providers
+- **AWS**: EKS clusters with S3 storage
+- **Civo**: Kubernetes clusters with Object Store
+- **Multi-Cloud**: Deploy to both simultaneously
+
+### 🚀 Quick Deployment
+```bash
+# Deploy to Civo (cost-effective, developer-friendly)
+./scripts/civo/deploy-to-civo.sh -e prod -t full
+
+# Deploy to AWS (enterprise-ready)
+./scripts/aws/deploy-to-aws.sh -e prod -t full
+
+# Deploy to both clouds
+./scripts/deploy-multi-cloud.ps1 -CloudProvider both -Environment prod
+```
+
+### 💰 Cost Comparison
+| Cloud | Minimal Setup | Full Production | Enterprise Scale |
+|-------|---------------|-----------------|------------------|
+| **Civo** | ~$11/month | ~$75/month | ~$150/month |
+| **AWS** | ~$50/month | ~$200/month | ~$500/month |
+
+### 📋 Deployment Options
+- **Minimal**: Single node, local storage (~$11/month on Civo)
+- **Full**: Multi-node, load balancers, monitoring
+- **ObjectStore**: Optimized for large word datasets
+
+See [CIVO_DEPLOYMENT.md](CIVO_DEPLOYMENT.md) and [AWS_SETUP.md](AWS_SETUP.md) for detailed guides.
+
 ## Technologies Used
 
 - **Backend**: FastAPI, Python, Uvicorn
@@ -203,7 +239,9 @@ Modify `frontend/src/app/app.component.css` and `frontend/src/styles.css` to cus
 - **HTTP Client**: Angular HttpClient
 - **CI/CD**: GitHub Actions, Docker, Dependabot
 - **Testing**: pytest, Karma/Jasmine, Coverage reporting
-- **Deployment**: Docker containers, Kubernetes support
+- **Cloud**: AWS EKS, Civo Kubernetes, Multi-cloud support
+- **Storage**: S3, Civo Object Store, Local files
+- **Infrastructure**: Terraform, Kubernetes, Docker
 
 ## Development
 

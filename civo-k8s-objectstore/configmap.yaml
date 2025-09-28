@@ -1,0 +1,183 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: civo-objectstore-config
+  namespace: word-filter-app
+  labels:
+    app: word-filter
+    cloud-provider: civo
+    storage-type: objectstore
+data:
+  # Civo Object Store Configuration
+  # These values should be updated with actual Terraform outputs
+  BUCKET_NAME: "word-filter-storage"
+  WORDS_FILE_KEY: "words.txt"
+  ENDPOINT_URL: ""  # Will be populated by Terraform: e.g., "https://objectstore.lon1.civo.com"
+  REGION: "LON1"    # Civo region
+  
+  # Application Configuration
+  CORS_ORIGINS: "*"  # In production, set to specific domains
+  ENVIRONMENT: "production"
+  LOG_LEVEL: "INFO"
+  
+  # Performance Configuration
+  MAX_WORKERS: "4"
+  KEEP_ALIVE: "2"
+  TIMEOUT_KEEP_ALIVE: "5"
+  MAX_REQUEST_SIZE: "10485760"  # 10MB
+  
+  # Cache Configuration
+  ENABLE_CACHING: "true"
+  CACHE_TTL: "3600"       # 1 hour
+  CACHE_MAX_SIZE: "1000"  # Max cached items
+  
+  # Feature Flags
+  ENABLE_WORD_MANAGEMENT: "true"
+  ENABLE_OXFORD_VALIDATION: "true"
+  ENABLE_METRICS: "true"
+  ENABLE_REQUEST_LOGGING: "true"
+  
+  # Rate Limiting
+  RATE_LIMIT_REQUESTS: "1000"  # Per minute
+  RATE_LIMIT_WINDOW: "60"      # Seconds
+  
+  # Object Store Specific Settings
+  S3_SIGNATURE_VERSION: "s3v4"
+  S3_USE_SSL: "true"
+  S3_VERIFY_SSL: "true"
+  
+  # Backup Configuration
+  BACKUP_ENABLED: "true"
+  BACKUP_INTERVAL: "3600"      # Every hour
+  BACKUP_RETENTION: "168"      # 7 days in hours
+  
+  # Monitoring
+  PROMETHEUS_ENABLED: "true"
+  PROMETHEUS_PORT: "9090"
+
+---
+# Production-specific ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: civo-objectstore-config-prod
+  namespace: word-filter-app
+  labels:
+    app: word-filter
+    cloud-provider: civo
+    storage-type: objectstore
+    environment: production
+data:
+  # Production overrides
+  LOG_LEVEL: "WARN"
+  ENABLE_REQUEST_LOGGING: "false"
+  RATE_LIMIT_REQUESTS: "2000"  # Higher limits for prod
+  CACHE_TTL: "7200"            # 2 hours
+  BACKUP_INTERVAL: "1800"      # Every 30 minutes
+
+---
+# Development-specific ConfigMap  
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: civo-objectstore-config-dev
+  namespace: word-filter-app
+  labels:
+    app: word-filter
+    cloud-provider: civo
+    storage-type: objectstore
+    environment: development
+data:
+  # Development overrides
+  LOG_LEVEL: "DEBUG"
+  ENABLE_REQUEST_LOGGING: "true"
+  RATE_LIMIT_REQUESTS: "500"   # Lower limits for dev
+  CACHE_TTL: "300"             # 5 minutes
+  BACKUP_ENABLED: "false"      # No backups in dev
+
+---
+# Instructions ConfigMap for deployment
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: civo-objectstore-instructions
+  namespace: word-filter-app
+  labels:
+    app: word-filter
+    cloud-provider: civo
+    purpose: documentation
+data:
+  README.md: |
+    # Civo Object Store Configuration
+    
+    ## Setup Instructions
+    
+    1. **Update Object Store Endpoint**: 
+       After running Terraform, update the ENDPOINT_URL in civo-objectstore-config ConfigMap:
+       ```bash
+       kubectl patch configmap civo-objectstore-config -n word-filter-app \
+         --type merge -p '{"data":{"ENDPOINT_URL":"YOUR_TERRAFORM_OUTPUT_ENDPOINT"}}'
+       ```
+    
+    2. **Create Credentials Secret**:
+       ```bash
+       kubectl create secret generic civo-objectstore-credentials \
+         --from-literal=ACCESS_KEY_ID=your-access-key \
+         --from-literal=SECRET_ACCESS_KEY=your-secret-key \
+         -n word-filter-app
+       ```
+    
+    3. **Upload Initial Words File**:
+       Use Civo CLI or web interface to upload words.txt to your object store bucket.
+    
+    ## Verification
+    
+    Check if the backend can access object store:
+    ```bash
+    kubectl logs -n word-filter-app -l app=word-filter-backend,version=objectstore
+    ```
+    
+    ## Troubleshooting
+    
+    - Verify object store credentials: `kubectl get secret civo-objectstore-credentials -n word-filter-app -o yaml`
+    - Check endpoint URL: `kubectl get configmap civo-objectstore-config -n word-filter-app -o yaml`
+    - Monitor pod status: `kubectl get pods -n word-filter-app -l version=objectstore`
+    
+  TERRAFORM_INTEGRATION.md: |
+    # Terraform Integration
+    
+    This deployment is designed to work with the civo-terraform configuration.
+    
+    ## After running terraform apply:
+    
+    1. Get the object store endpoint:
+       ```bash
+       terraform output object_store_endpoint
+       ```
+    
+    2. Get the credentials (if using terraform-generated ones):
+       ```bash
+       terraform output -json object_store_credentials
+       ```
+    
+    3. Update the ConfigMap with the real endpoint:
+       ```bash
+       ENDPOINT=$(terraform output -raw object_store_endpoint)
+       kubectl patch configmap civo-objectstore-config -n word-filter-app \
+         --type merge -p "{\"data\":{\"ENDPOINT_URL\":\"$ENDPOINT\"}}"
+       ```
+    
+    4. Create the credentials secret:
+       ```bash
+       ACCESS_KEY=$(terraform output -json object_store_credentials | jq -r '.access_key_id')
+       SECRET_KEY=$(terraform output -json object_store_credentials | jq -r '.secret_access_key')
+       kubectl create secret generic civo-objectstore-credentials \
+         --from-literal=ACCESS_KEY_ID="$ACCESS_KEY" \
+         --from-literal=SECRET_ACCESS_KEY="$SECRET_KEY" \
+         -n word-filter-app
+       ```
+    
+    5. Deploy the application:
+       ```bash
+       kubectl apply -f .
+       ```

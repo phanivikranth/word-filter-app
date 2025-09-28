@@ -1,0 +1,166 @@
+# Ingress for Word Filter App on Civo (using Traefik)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: word-filter-ingress
+  namespace: word-filter-app
+  labels:
+    app: word-filter
+    cloud-provider: civo
+  annotations:
+    # Traefik-specific annotations (Civo uses Traefik by default)
+    kubernetes.io/ingress.class: "traefik"
+    traefik.ingress.kubernetes.io/router.entrypoints: "web,websecure"
+    traefik.ingress.kubernetes.io/router.middlewares: "word-filter-app-cors@kubernetescrd"
+    
+    # CORS configuration
+    traefik.ingress.kubernetes.io/router.middlewares: "word-filter-app-cors@kubernetescrd,word-filter-app-rate-limit@kubernetescrd"
+    
+    # SSL/TLS (if using cert-manager)
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    
+    # Load balancing
+    traefik.ingress.kubernetes.io/service.loadbalancer.method: "roundrobin"
+spec:
+  # TLS configuration (optional)
+  tls:
+  - hosts:
+    - word-filter.your-domain.com  # Replace with your actual domain
+    secretName: word-filter-tls
+    
+  rules:
+  # Default rule (using load balancer IP)
+  - http:
+      paths:
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: word-filter-backend
+            port:
+              number: 8001
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: word-filter-frontend
+            port:
+              number: 80
+  
+  # Domain-specific rule (if you have a domain)
+  - host: word-filter.your-domain.com
+    http:
+      paths:
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: word-filter-backend
+            port:
+              number: 8001
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: word-filter-frontend
+            port:
+              number: 80
+
+---
+# CORS Middleware for Traefik
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: cors
+  namespace: word-filter-app
+spec:
+  headers:
+    accessControlAllowMethods:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+      - OPTIONS
+    accessControlAllowOriginList:
+      - "*"  # In production, replace with specific domains
+    accessControlAllowHeaders:
+      - "*"
+    accessControlExposeHeaders:
+      - "*"
+    accessControlAllowCredentials: true
+    accessControlMaxAge: 100
+    addVaryHeader: true
+
+---
+# Rate Limiting Middleware
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: rate-limit
+  namespace: word-filter-app
+spec:
+  rateLimit:
+    average: 100      # 100 requests per minute
+    period: 1m
+    burst: 50         # Allow bursts up to 50 requests
+
+---
+# API Rate Limiting (stricter for API endpoints)
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: api-rate-limit
+  namespace: word-filter-app
+spec:
+  rateLimit:
+    average: 200      # 200 API requests per minute
+    period: 1m
+    burst: 100
+
+---
+# Redirect HTTP to HTTPS (if using SSL)
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: redirect-to-https
+  namespace: word-filter-app
+spec:
+  redirectScheme:
+    scheme: https
+    permanent: true
+
+---
+# Separate Ingress for API with different rate limiting
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: word-filter-api-ingress
+  namespace: word-filter-app
+  labels:
+    app: word-filter-backend
+    component: api
+    cloud-provider: civo
+  annotations:
+    kubernetes.io/ingress.class: "traefik"
+    traefik.ingress.kubernetes.io/router.entrypoints: "web,websecure"
+    traefik.ingress.kubernetes.io/router.middlewares: "word-filter-app-cors@kubernetescrd,word-filter-app-api-rate-limit@kubernetescrd"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    traefik.ingress.kubernetes.io/router.tls: "true"
+spec:
+  tls:
+  - hosts:
+    - api.word-filter.your-domain.com
+    secretName: word-filter-api-tls
+    
+  rules:
+  - host: api.word-filter.your-domain.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: word-filter-backend
+            port:
+              number: 8001

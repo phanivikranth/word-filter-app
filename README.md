@@ -1,5 +1,11 @@
 # Word Filter Application
 
+[![CI/CD](https://github.com/phanivikranth/word-filter-app/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/phanivikranth/word-filter-app/actions/workflows/ci-cd.yml)
+[![Release](https://github.com/phanivikranth/word-filter-app/actions/workflows/release.yml/badge.svg)](https://github.com/phanivikranth/word-filter-app/actions/workflows/release.yml)
+[![License](https://img.shields.io/github/license/phanivikranth/word-filter-app)](LICENSE)
+[![Docker Backend](https://img.shields.io/docker/v/phanivikranth/word-filter-backend?label=backend%20image)](https://hub.docker.com/r/phanivikranth/word-filter-backend)
+[![Docker Frontend](https://img.shields.io/docker/v/phanivikranth/word-filter-frontend?label=frontend%20image)](https://hub.docker.com/r/phanivikranth/word-filter-frontend)
+
 A full-stack web application for filtering words and solving word puzzles, built with FastAPI backend and Angular frontend.
 
 ## Features
@@ -195,12 +201,44 @@ Modify `frontend/src/app/app.component.css` and `frontend/src/styles.css` to cus
 - **Frontend**: Angular, TypeScript, RxJS
 - **Styling**: CSS Grid, Flexbox, CSS Variables
 - **HTTP Client**: Angular HttpClient
+- **CI/CD**: GitHub Actions, Docker, Dependabot
+- **Testing**: pytest, Karma/Jasmine, Coverage reporting
+- **Deployment**: Docker containers, Kubernetes support
 
 ## Development
 
 Both servers support hot reload:
 - FastAPI: Automatically reloads when Python files change
 - Angular: Automatically reloads when TypeScript/HTML/CSS files change
+
+## CI/CD Pipeline
+
+This project includes a comprehensive CI/CD pipeline with GitHub Actions:
+
+### 🔄 Automated Testing
+- **Backend**: pytest with coverage reporting
+- **Frontend**: Karma/Jasmine with Angular testing utilities
+- **Integration**: End-to-end API testing
+- **Security**: Dependency vulnerability scanning
+
+### 🚀 Automated Deployment
+- **Docker**: Automatic image building and publishing
+- **Releases**: Tagged releases with changelog generation
+- **Dependencies**: Automated dependency updates with Dependabot
+
+### 📋 Quality Assurance
+- **Code Linting**: Python (black, flake8, isort) and TypeScript (ESLint)
+- **PR Validation**: Conventional commit format checking
+- **Security Scanning**: Trivy vulnerability scanner
+
+### 🔧 Getting Started with CI/CD
+1. Fork the repository
+2. Add required secrets (see `.github/README.md`)
+3. Push changes to trigger automated testing
+4. Create PRs for automatic validation
+5. Tag releases (`v1.0.0`) for automated deployment
+
+For detailed CI/CD documentation, see [`.github/README.md`](.github/README.md).
 
 ## Troubleshooting
 

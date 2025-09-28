@@ -1,0 +1,170 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    name: Create Release
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        
+    - name: Generate changelog
+      id: changelog
+      run: |
+        # Get the latest tag
+        LATEST_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+        
+        # Generate changelog since last tag
+        if [[ -n "$LATEST_TAG" ]]; then
+          echo "## Changes since $LATEST_TAG" >> CHANGELOG.md
+          git log --pretty=format:"- %s (%h)" $LATEST_TAG..HEAD >> CHANGELOG.md
+        else
+          echo "## Initial Release" >> CHANGELOG.md
+          git log --pretty=format:"- %s (%h)" HEAD >> CHANGELOG.md
+        fi
+        
+        # Set output for use in release
+        echo "changelog<<EOF" >> $GITHUB_OUTPUT
+        cat CHANGELOG.md >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+        
+    - name: Build release artifacts
+      run: |
+        # Create release directory
+        mkdir -p release
+        
+        # Build frontend
+        cd frontend
+        npm ci
+        npm run build --prod
+        cd ..
+        
+        # Create release package
+        tar -czf release/word-filter-frontend-${GITHUB_REF#refs/tags/}.tar.gz -C frontend/dist .
+        
+        # Copy backend files
+        cd backend
+        # Exclude venv, __pycache__, logs, etc.
+        tar --exclude='venv' --exclude='__pycache__' --exclude='logs' --exclude='*.log' \
+            -czf ../release/word-filter-backend-${GITHUB_REF#refs/tags/}.tar.gz .
+        cd ..
+        
+        # Create Docker compose for easy deployment
+        cp docker-compose.test.yml release/docker-compose-${GITHUB_REF#refs/tags/}.yml
+        
+    - name: Create Release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: Release ${{ github.ref }}
+        body: |
+          ${{ steps.changelog.outputs.changelog }}
+          
+          ## Docker Images
+          - Backend: `${{ secrets.DOCKER_USERNAME }}/word-filter-backend:${{ github.ref_name }}`
+          - Frontend: `${{ secrets.DOCKER_USERNAME }}/word-filter-frontend:${{ github.ref_name }}`
+          
+          ## Quick Start
+          ```bash
+          # Using Docker Compose
+          curl -O https://github.com/phanivikranth/word-filter-app/releases/download/${{ github.ref_name }}/docker-compose-${{ github.ref_name }}.yml
+          docker-compose -f docker-compose-${{ github.ref_name }}.yml up -d
+          ```
+        draft: false
+        prerelease: false
+        
+    - name: Upload Frontend Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./release/word-filter-frontend-${{ github.ref_name }}.tar.gz
+        asset_name: word-filter-frontend-${{ github.ref_name }}.tar.gz
+        asset_content_type: application/gzip
+        
+    - name: Upload Backend Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./release/word-filter-backend-${{ github.ref_name }}.tar.gz
+        asset_name: word-filter-backend-${{ github.ref_name }}.tar.gz
+        asset_content_type: application/gzip
+        
+    - name: Upload Docker Compose
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./release/docker-compose-${{ github.ref_name }}.yml
+        asset_name: docker-compose-${{ github.ref_name }}.yml
+        asset_content_type: application/x-yaml
+
+  # Build and push Docker images with release tag
+  docker-release:
+    runs-on: ubuntu-latest
+    name: Release Docker Images
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_TOKEN }}
+        
+    - name: Get version
+      id: version
+      run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+      
+    - name: Build and push backend Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: ./backend
+        file: ./backend/Dockerfile
+        push: true
+        tags: |
+          ${{ secrets.DOCKER_USERNAME }}/word-filter-backend:${{ steps.version.outputs.VERSION }}
+          ${{ secrets.DOCKER_USERNAME }}/word-filter-backend:latest
+        labels: |
+          org.opencontainers.image.title=Word Filter Backend
+          org.opencontainers.image.description=FastAPI backend for word filtering application
+          org.opencontainers.image.version=${{ steps.version.outputs.VERSION }}
+          org.opencontainers.image.source=https://github.com/phanivikranth/word-filter-app
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        
+    - name: Build and push frontend Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: ./frontend
+        file: ./frontend/Dockerfile
+        push: true
+        tags: |
+          ${{ secrets.DOCKER_USERNAME }}/word-filter-frontend:${{ steps.version.outputs.VERSION }}
+          ${{ secrets.DOCKER_USERNAME }}/word-filter-frontend:latest
+        labels: |
+          org.opencontainers.image.title=Word Filter Frontend
+          org.opencontainers.image.description=Angular frontend for word filtering application
+          org.opencontainers.image.version=${{ steps.version.outputs.VERSION }}
+          org.opencontainers.image.source=https://github.com/phanivikranth/word-filter-app
+        cache-from: type=gha
+        cache-to: type=gha,mode=max

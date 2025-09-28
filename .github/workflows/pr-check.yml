@@ -1,0 +1,173 @@
+name: PR Checks
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+jobs:
+  # Quick checks for PR validation
+  pr-validation:
+    runs-on: ubuntu-latest
+    name: PR Validation
+    if: github.event.pull_request.draft == false
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Check PR title format
+      run: |
+        PR_TITLE="${{ github.event.pull_request.title }}"
+        if [[ ! "$PR_TITLE" =~ ^(feat|fix|docs|style|refactor|perf|test|chore|ci|build)(\(.+\))?: .+ ]]; then
+          echo "❌ PR title doesn't follow conventional commit format"
+          echo "Expected format: type(scope): description"
+          echo "Types: feat, fix, docs, style, refactor, perf, test, chore, ci, build"
+          echo "Current title: $PR_TITLE"
+          exit 1
+        fi
+        echo "✅ PR title follows conventional commit format"
+        
+    - name: Check for breaking changes
+      run: |
+        if git diff --name-only origin/main..HEAD | grep -E "(main\.py|app\.component\.ts|package\.json|requirements\.txt)" > /dev/null; then
+          echo "⚠️  This PR modifies core files - please ensure backward compatibility"
+        fi
+        
+    - name: Check file sizes
+      run: |
+        # Check for large files that shouldn't be committed
+        find . -type f -size +10M -not -path "./node_modules/*" -not -path "./venv/*" -not -path "./.git/*" | while read file; do
+          echo "❌ Large file detected: $file ($(du -h "$file" | cut -f1))"
+          echo "Please use Git LFS for large files or add to .gitignore"
+        done
+        
+  # Fast linting and formatting checks
+  lint-check:
+    runs-on: ubuntu-latest
+    name: Lint Check
+    if: github.event.pull_request.draft == false
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
+        
+    - name: Install Python linting tools
+      run: |
+        pip install flake8 black isort
+        
+    - name: Check Python formatting
+      run: |
+        cd backend
+        # Check if code is formatted with black
+        black --check --diff . || (echo "❌ Python code is not formatted with black. Run 'black .' to fix." && exit 1)
+        
+        # Check import sorting
+        isort --check-only --diff . || (echo "❌ Python imports are not sorted. Run 'isort .' to fix." && exit 1)
+        
+        # Run flake8 for style guide enforcement
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+        
+    - name: Install frontend dependencies
+      run: |
+        cd frontend
+        npm ci
+        
+    - name: Check TypeScript/Angular linting
+      run: |
+        cd frontend
+        # Run Angular linting
+        npm run lint || (echo "❌ Frontend code has linting issues. Run 'npm run lint -- --fix' to fix." && exit 1)
+        
+  # Security checks
+  security-check:
+    runs-on: ubuntu-latest
+    name: Security Check
+    if: github.event.pull_request.draft == false
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Check for secrets
+      run: |
+        # Simple check for common secret patterns
+        if grep -r -E "(password|secret|key|token).*=.*['\"][^'\"]{10,}['\"]" . --exclude-dir=node_modules --exclude-dir=venv --exclude-dir=.git; then
+          echo "⚠️  Potential secrets found in code. Please review and use environment variables."
+        fi
+        
+    - name: Check Python dependencies for known vulnerabilities
+      run: |
+        cd backend
+        pip install safety
+        safety check -r requirements.txt || echo "⚠️  Some Python dependencies have known vulnerabilities"
+        
+    - name: Check npm audit
+      run: |
+        cd frontend
+        npm audit --audit-level=high || echo "⚠️  Some npm dependencies have known vulnerabilities"
+
+  # Comment on PR with results
+  pr-comment:
+    needs: [pr-validation, lint-check, security-check]
+    runs-on: ubuntu-latest
+    name: PR Comment
+    if: always() && github.event.pull_request.draft == false
+    
+    steps:
+    - name: Comment PR
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const { data: pr } = await github.rest.pulls.get({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            pull_number: context.issue.number
+          });
+          
+          let comment = '## 🤖 PR Checks Summary\n\n';
+          
+          const jobs = [
+            { name: 'PR Validation', status: '${{ needs.pr-validation.result }}' },
+            { name: 'Lint Check', status: '${{ needs.lint-check.result }}' },
+            { name: 'Security Check', status: '${{ needs.security-check.result }}' }
+          ];
+          
+          jobs.forEach(job => {
+            const emoji = job.status === 'success' ? '✅' : job.status === 'failure' ? '❌' : '⚠️';
+            comment += `${emoji} **${job.name}**: ${job.status}\n`;
+          });
+          
+          comment += '\n---\n';
+          comment += 'Thank you for your contribution! 🎉\n\n';
+          
+          if (jobs.some(job => job.status === 'failure')) {
+            comment += '❌ Some checks failed. Please review the workflow logs and fix the issues.\n\n';
+          } else {
+            comment += '✅ All checks passed! This PR is ready for review.\n\n';
+          }
+          
+          comment += '💡 **Tips:**\n';
+          comment += '- Ensure all tests pass locally before pushing\n';
+          comment += '- Follow the conventional commit format for PR titles\n';
+          comment += '- Add tests for new features\n';
+          comment += '- Update documentation if needed\n';
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: comment
+          });

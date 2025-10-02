@@ -535,9 +535,19 @@ async def add_word_with_validation(request: ValidateWordRequest):
                     word=word
                 )
         
-        # Add to collection (in-memory only for this demo)
+        # Add to collection (both in-memory and to file)
         words_set.add(word)
         words_list.append(word)
+        
+        # Write to words.txt file
+        try:
+            words_file_path = Path("words.txt")
+            with open(words_file_path, "a", encoding="utf-8") as f:
+                f.write(f"{word}\n")
+            logger.info(f"Successfully added word '{word}' to words.txt file")
+        except Exception as e:
+            logger.error(f"Failed to write word '{word}' to file: {e}")
+            # Still return success since it was added to memory
         
         # Update stats
         word_stats["total_words"] = len(words_list)

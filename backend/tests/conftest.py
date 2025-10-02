@@ -39,7 +39,9 @@ def create_test_app():
         "cat", "catch", "catching", "category",
         "dog", "digital", "development", "data",
         "elephant", "engineering", "example", "excellent",
-        "python", "programming", "project", "performance"
+        "python", "programming", "project", "performance",
+        "testing", "technology", "tool", "team",
+        "understanding", "user", "unique", "update"
     ]
     
     test_word_stats = {
@@ -58,8 +60,32 @@ def create_test_app():
         return test_word_stats
     
     @test_app.get("/words")
-    async def get_words(limit: int = 100):
-        return test_words[:limit]
+    async def get_words(
+        limit: int = 100,
+        contains: str = None,
+        starts_with: str = None,
+        ends_with: str = None,
+        min_length: int = None,
+        max_length: int = None,
+        exact_length: int = None
+    ):
+        filtered_words = test_words.copy()
+        
+        # Apply filters
+        if contains:
+            filtered_words = [w for w in filtered_words if contains in w]
+        if starts_with:
+            filtered_words = [w for w in filtered_words if w.startswith(starts_with)]
+        if ends_with:
+            filtered_words = [w for w in filtered_words if w.endswith(ends_with)]
+        if min_length is not None:
+            filtered_words = [w for w in filtered_words if len(w) >= min_length]
+        if max_length is not None:
+            filtered_words = [w for w in filtered_words if len(w) <= max_length]
+        if exact_length is not None:
+            filtered_words = [w for w in filtered_words if len(w) == exact_length]
+        
+        return filtered_words[:limit]
     
     @test_app.get("/words/check")
     async def check_word(word: str):
@@ -74,6 +100,137 @@ def create_test_app():
             "process_pool_workers": 2,
             "optimization_features": ["Testing mode"]
         }
+    
+    # Oxford Dictionary integration endpoints
+    @test_app.post("/words/validate")
+    async def validate_word(request: dict):
+        word = request.get("word", "").lower()
+        skip_oxford = request.get("skip_oxford", False)
+        
+        if skip_oxford:
+            return {
+                "success": True,
+                "word": word,
+                "oxford_validation": {
+                    "word": word,
+                    "is_valid": True,
+                    "definitions": ["Test definition"],
+                    "word_forms": ["noun"],
+                    "examples": ["This is a test example."],
+                    "reason": "Skipped Oxford validation"
+                },
+                "message": f"Validation complete for '{word}'"
+            }
+        
+        # Mock Oxford validation - be more strict for testing
+        is_valid = word in test_words or (len(word) > 2 and word.isalpha())
+        return {
+            "success": True,
+            "word": word,
+            "oxford_validation": {
+                "word": word,
+                "is_valid": is_valid,
+                "definitions": ["Test definition"] if is_valid else [],
+                "word_forms": ["noun"] if is_valid else [],
+                "examples": ["This is a test example."] if is_valid else [],
+                "reason": "Found in Oxford Dictionary" if is_valid else "Not found in Oxford Dictionary"
+            },
+            "message": f"Validation complete for '{word}'"
+        }
+    
+    @test_app.get("/words/search-basic")
+    async def search_basic_word(word: str):
+        word_lower = word.lower()
+        in_collection = word_lower in test_words
+        
+        # Mock Oxford result - be more strict
+        is_valid = word_lower in test_words or (len(word_lower) > 2 and word_lower.isalpha())
+        oxford_result = {
+            "word": word_lower,
+            "is_valid": is_valid,
+            "definitions": ["Test definition"] if is_valid else [],
+            "word_forms": ["noun"] if is_valid else [],
+            "examples": ["This is a test example."] if is_valid else [],
+            "reason": "Found in Oxford Dictionary" if is_valid else "Not found in Oxford Dictionary"
+        }
+        
+        return {
+            "word": word_lower,
+            "inCollection": in_collection,
+            "oxford": oxford_result if oxford_result["is_valid"] else None
+        }
+    
+    @test_app.post("/words/add-validated")
+    async def add_word_with_validation(request: dict):
+        word = request.get("word", "").lower()
+        skip_oxford = request.get("skip_oxford", False)
+        
+        if not word or not word.isalpha():
+            return {
+                "success": False,
+                "message": "Word must contain only letters",
+                "word": word
+            }
+        
+        if word in test_words:
+            return {
+                "success": True,
+                "message": f"Word '{word}' already exists in collection",
+                "word": word
+            }
+        
+        # Mock Oxford validation if not skipped
+        if not skip_oxford:
+            is_valid = word in test_words or (len(word) > 2 and word.isalpha())
+            oxford_result = {
+                "word": word,
+                "is_valid": is_valid,
+                "definitions": ["Test definition"] if is_valid else [],
+                "word_forms": ["noun"] if is_valid else [],
+                "examples": ["This is a test example."] if is_valid else [],
+                "reason": "Found in Oxford Dictionary" if is_valid else "Not found in Oxford Dictionary"
+            }
+            
+            if not oxford_result["is_valid"]:
+                return {
+                    "success": False,
+                    "message": f"Word '{word}' not found in Oxford Dictionary: {oxford_result['reason']}",
+                    "word": word
+                }
+        
+        # Add to test words (simulate adding to collection)
+        test_words.append(word)
+        
+        return {
+            "success": True,
+            "message": f"Word '{word}' added successfully",
+            "word": word
+        }
+    
+    # Add missing endpoints
+    @test_app.get("/words/by-length/{length}")
+    async def get_words_by_length(length: int):
+        words_of_length = [w for w in test_words if len(w) == length]
+        return {
+            "length": length,
+            "count": len(words_of_length),
+            "words": words_of_length
+        }
+    
+    @test_app.get("/words/interactive")
+    async def get_interactive_words(length: int, pattern: str):
+        if length <= 0:
+            return []
+        
+        # Simple pattern matching (convert ? to any character)
+        import re
+        pattern_regex = pattern.replace('?', '.')
+        try:
+            regex = re.compile(f'^{pattern_regex}$')
+            matching_words = [w for w in test_words if len(w) == length and regex.match(w)]
+            return matching_words
+        except:
+            return []
     
     return test_app
 
@@ -179,6 +336,23 @@ def mock_word_stats():
         "max_length": 20,
         "avg_length": 7.5
     }
+
+@pytest.fixture
+def temp_words_file(tmp_path):
+    """Create a temporary words.txt file for testing file operations"""
+    words_file = tmp_path / "words.txt"
+    test_words = ["apple", "banana", "cherry", "date", "elderberry"]
+    words_file.write_text('\n'.join(test_words))
+    
+    # Change to the temporary directory so the file operations work
+    import os
+    original_cwd = os.getcwd()
+    os.chdir(tmp_path)
+    
+    yield str(words_file)
+    
+    # Restore original directory
+    os.chdir(original_cwd)
 
 # Pytest configuration
 def pytest_configure(config):

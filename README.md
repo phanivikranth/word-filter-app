@@ -284,3 +284,5 @@ For detailed CI/CD documentation, see [`.github/README.md`](.github/README.md).
 2. **Connection Refused**: Ensure both servers are running
 3. **No Words Found**: Check that `words.txt` exists and contains words
 4. **Port Conflicts**: Modify ports in the configuration if needed
+#   T e s t   t r i g g e r  
+ 

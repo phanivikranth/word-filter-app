@@ -28,9 +28,9 @@
   --gray-900: #0f172a;
   
   /* Background Colors */
-  --bg-primary: #ffffff;
-  --bg-secondary: #f8fafc;
-  --bg-light: #f1f5f9;
+  --bg-primary: linear-gradient(135deg, #87CEEB 0%, #B0E0E6 100%);
+  --bg-secondary: linear-gradient(135deg, #ADD8E6 0%, #E0F6FF 100%);
+  --bg-light: linear-gradient(135deg, #F0F8FF 0%, #E6F3FF 100%);
   --bg-white: #ffffff;
   
   /* Surface Colors */
@@ -117,10 +117,27 @@ body {
   line-height: 1.6;
   color: var(--text-primary);
   background: var(--bg-primary);
+  background-attachment: fixed;
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
+  position: relative;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: 
+    radial-gradient(circle at 20% 80%, rgba(135, 206, 235, 0.4) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(176, 224, 230, 0.3) 0%, transparent 50%),
+    radial-gradient(circle at 40% 40%, rgba(173, 216, 230, 0.2) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: -1;
 }
 
 /* Scrollbar Styling - Clean */

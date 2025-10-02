@@ -8,6 +8,8 @@ import functools
 import time
 from pathlib import Path
 import uuid
+from pydantic import BaseModel
+from oxford_validator import OxfordValidator
 
 # Import logging configuration
 from logger_config import (
@@ -18,6 +20,21 @@ from logger_config import (
 # Initialize logging
 setup_logging()
 logger = get_logger("word_filter.main")
+
+# Pydantic models
+class ValidateWordRequest(BaseModel):
+    word: str
+    skip_oxford: bool = False
+
+class BasicSearchResult(BaseModel):
+    word: str
+    inCollection: bool
+    oxford: Optional[dict] = None
+
+class AddWordResponse(BaseModel):
+    success: bool
+    message: str
+    word: Optional[str] = None
 
 app = FastAPI(
     title="Word Filter API - Optimized", 
@@ -91,6 +108,9 @@ word_stats = {}
 # Thread pool for IO operations
 thread_pool = ThreadPoolExecutor(max_workers=4)
 process_pool = ProcessPoolExecutor(max_workers=2)
+
+# Initialize Oxford validator
+oxford_validator = OxfordValidator()
 
 @monitor_async_performance("load_words_concurrent")
 async def load_words_concurrent():
@@ -434,6 +454,105 @@ async def get_performance_stats():
             "Memory-efficient file reading"
         ]
     }
+
+# Oxford Dictionary Integration Endpoints
+
+@app.post("/words/validate")
+async def validate_word(request: ValidateWordRequest):
+    """Validate a word using Oxford Dictionary API"""
+    try:
+        word = request.word.strip()
+        if not word:
+            raise HTTPException(status_code=400, detail="Word cannot be empty")
+        
+        if not word.isalpha():
+            raise HTTPException(status_code=400, detail="Word must contain only letters")
+        
+        validation_result = await oxford_validator.validate_word(word)
+        
+        return {
+            "success": True,
+            "word": word.lower(),
+            "oxford_validation": validation_result,
+            "message": f"Validation complete for '{word}'"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error validating word: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@app.get("/words/search-basic")
+async def search_basic_word(word: str):
+    """Search for a word in our collection and Oxford Dictionary"""
+    try:
+        word_lower = word.strip().lower()
+        if not word_lower or not word_lower.isalpha():
+            raise HTTPException(status_code=400, detail="Word must contain only letters")
+        
+        # Check if word is in our collection
+        in_collection = word_lower in words_set
+        
+        # Get Oxford Dictionary data
+        oxford_result = await oxford_validator.validate_word(word_lower)
+        
+        return BasicSearchResult(
+            word=word_lower,
+            inCollection=in_collection,
+            oxford=oxford_result if oxford_result["is_valid"] else None
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in basic search: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@app.post("/words/add-validated")
+async def add_word_with_validation(request: ValidateWordRequest):
+    """Add a word with Oxford Dictionary validation"""
+    try:
+        word = request.word.strip().lower()
+        if not word or not word.isalpha():
+            raise HTTPException(status_code=400, detail="Word must contain only letters")
+        
+        # Check if word already exists
+        if word in words_set:
+            return AddWordResponse(
+                success=True,
+                message=f"Word '{word}' already exists in collection",
+                word=word
+            )
+        
+        # Validate with Oxford Dictionary if requested
+        if not request.skip_oxford:
+            oxford_result = await oxford_validator.validate_word(word)
+            if not oxford_result["is_valid"]:
+                return AddWordResponse(
+                    success=False,
+                    message=f"Word '{word}' not found in Oxford Dictionary: {oxford_result['reason']}",
+                    word=word
+                )
+        
+        # Add to collection (in-memory only for this demo)
+        words_set.add(word)
+        words_list.append(word)
+        
+        # Update stats
+        word_stats["total_words"] = len(words_list)
+        
+        return AddWordResponse(
+            success=True,
+            message=f"Word '{word}' added successfully",
+            word=word
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error adding validated word: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 if __name__ == "__main__":
     import uvicorn

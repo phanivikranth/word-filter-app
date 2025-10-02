@@ -48,6 +48,7 @@ class OxfordValidator:
                 "is_valid": False,
                 "definitions": [],
                 "word_forms": [],
+                "examples": [],
                 "reason": "Invalid word format (must contain only letters)"
             }
         
@@ -71,6 +72,7 @@ class OxfordValidator:
                 "is_valid": False,
                 "definitions": [],
                 "word_forms": [],
+                "examples": [],
                 "reason": f"Error during validation: {str(e)}"
             }
     
@@ -99,6 +101,7 @@ class OxfordValidator:
                     "is_valid": False,
                     "definitions": [],
                     "word_forms": [],
+                    "examples": [],
                     "reason": "Not found in Oxford Dictionary"
                 }
             else:
@@ -108,6 +111,7 @@ class OxfordValidator:
                     "is_valid": False,
                     "definitions": [],
                     "word_forms": [],
+                    "examples": [],
                     "reason": f"HTTP error: {response.status_code}"
                 }
                 
@@ -118,6 +122,7 @@ class OxfordValidator:
                 "is_valid": False,
                 "definitions": [],
                 "word_forms": [],
+                "examples": [],
                 "reason": f"Network error: {str(e)}"
             }
     
@@ -136,6 +141,7 @@ class OxfordValidator:
                     "is_valid": False,
                     "definitions": [],
                     "word_forms": [],
+                    "examples": [],
                     "reason": "No definition section found"
                 }
             
@@ -155,14 +161,57 @@ class OxfordValidator:
                 if pos_text and pos_text not in word_forms:
                     word_forms.append(pos_text)
             
+            # Extract examples from Oxford Dictionary
+            examples = []
+            
+            # Look for example sentences in various possible selectors
+            example_selectors = [
+                'span.x',  # Oxford Learner's Dictionary example class
+                'span.x-g',  # Another possible example class
+                'div.x',  # Example div
+                'span[class*="x"]',  # Any span with class containing 'x'
+                'div[class*="example"]',  # Any div with class containing 'example'
+                'span[class*="example"]',  # Any span with class containing 'example'
+                'li.x',  # Example in list item
+                'p.x'  # Example in paragraph
+            ]
+            
+            for selector in example_selectors:
+                example_elements = soup.select(selector)
+                for example_elem in example_elements[:3]:  # Limit to first 3 examples per selector
+                    example_text = example_elem.get_text(strip=True)
+                    if example_text and len(example_text) > 10 and example_text not in examples:
+                        # Clean up the example text
+                        example_text = example_text.replace('•', '').strip()
+                        if example_text:
+                            examples.append(example_text)
+            
+            # If no examples found with specific selectors, try a broader search
+            if not examples:
+                # Look for any text that might be examples (contains the word and is in quotes or italics)
+                all_text_elements = soup.find_all(['span', 'div', 'p', 'li'])
+                for elem in all_text_elements:
+                    text = elem.get_text(strip=True)
+                    if (text and len(text) > 15 and len(text) < 200 and 
+                        word.lower() in text.lower() and 
+                        ('"' in text or "'" in text or text.endswith('.')) and
+                        text not in examples):
+                        examples.append(text)
+            
+            # Limit total examples to 5
+            examples = examples[:5]
+            
             is_valid = len(definitions) > 0
-            reason = f"Found in Oxford Dictionary with {len(definitions)} definition(s)" if is_valid else "No definitions found"
+            reason = f"Found in Oxford Dictionary with {len(definitions)} definition(s)"
+            if examples:
+                reason += f" and {len(examples)} example(s)"
             
             return {
                 "word": word,
                 "is_valid": is_valid,
                 "definitions": definitions,
                 "word_forms": word_forms,
+                "examples": examples,
                 "reason": reason
             }
             
@@ -173,6 +222,7 @@ class OxfordValidator:
                 "is_valid": False,
                 "definitions": [],
                 "word_forms": [],
+                "examples": [],
                 "reason": f"HTML parsing error: {str(e)}"
             }
     
@@ -218,6 +268,7 @@ class OxfordValidator:
                         "is_valid": False,
                         "definitions": [],
                         "word_forms": [],
+                        "examples": [],
                         "reason": f"Exception: {str(result)}"
                     })
                 else:

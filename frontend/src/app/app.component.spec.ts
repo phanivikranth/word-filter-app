@@ -75,11 +75,10 @@ describe('AppComponent', () => {
 
   it('should have default values', () => {
     expect(component.title).toBe('Word Filter App');
-    expect(component.activeTab).toBe('filter');
     expect(component.searchMode).toBe('basic');
-    expect(component.basicSearchTerm).toBe('');
-    expect(component.basicSearchResult).toBeNull();
-    expect(component.isBasicSearching).toBeFalse();
+    expect(component.searchWord).toBe('');
+    expect(component.searchResult).toBeNull();
+    expect(component.isSearching).toBeFalse();
     expect(component.words).toEqual([]);
     expect(component.loading).toBeFalse();
     expect(component.interactiveWords).toEqual([]);
@@ -237,65 +236,57 @@ describe('AppComponent', () => {
     });
 
     it('should perform basic word search', () => {
-      component.basicSearchTerm = 'example';
+      component.searchWord = 'example';
 
-      component.searchBasicWord();
+      component.searchWordBasic();
 
       expect(wordService.searchBasicWord).toHaveBeenCalledWith('example');
-      expect(component.basicSearchResult).toEqual(mockBasicSearchResult);
-      expect(component.isBasicSearching).toBeFalse();
-      expect(component.basicSearchError).toBe('');
+      expect(component.searchResult).toEqual(mockBasicSearchResult);
+      expect(component.isSearching).toBeFalse();
+      expect(component.searchError).toBe('');
     });
 
     it('should validate basic search input', () => {
-      component.basicSearchTerm = '';
+      component.searchWord = '';
 
-      component.searchBasicWord();
+      component.searchWordBasic();
 
-      expect(component.basicSearchError).toBe('Please enter a word to search.');
+      expect(component.searchError).toBe('Please enter a word to search.');
       expect(wordService.searchBasicWord).not.toHaveBeenCalled();
     });
 
     it('should validate word contains only letters', () => {
-      component.basicSearchTerm = 'test123';
+      component.searchWord = 'test123';
 
-      component.searchBasicWord();
+      component.searchWordBasic();
 
-      expect(component.basicSearchError).toBe('Word must contain only letters.');
+      expect(component.searchError).toBe('Word must contain only letters.');
       expect(wordService.searchBasicWord).not.toHaveBeenCalled();
     });
 
     it('should handle basic search errors', () => {
       wordService.searchBasicWord.and.returnValue(throwError(() => new Error('API Error')));
-      component.basicSearchTerm = 'valid';
+      component.searchWord = 'valid';
 
-      component.searchBasicWord();
+      component.searchWordBasic();
 
-      expect(component.basicSearchError).toBe('Failed to search word. Please check your connection and try again.');
-      expect(component.isBasicSearching).toBeFalse();
+      expect(component.searchError).toBe('Failed to search word. Please check your connection and try again.');
+      expect(component.isSearching).toBeFalse();
     });
 
     it('should set loading state during basic search', () => {
-      component.basicSearchTerm = 'test';
+      component.searchWord = 'test';
       // Use a delayed observable instead of promise wrapping
       const delayedResult = new Promise<BasicSearchResult>(resolve => {
         setTimeout(() => resolve(mockBasicSearchResult), 100);
       });
       wordService.searchBasicWord.and.returnValue(from(delayedResult));
 
-      component.searchBasicWord();
+      component.searchWordBasic();
 
-      expect(component.isBasicSearching).toBeTruthy();
+      expect(component.isSearching).toBeTruthy();
     });
 
-    it('should search suggestion word', () => {
-      spyOn(component, 'searchBasicWord');
-      
-      component.searchSuggestionWord('suggested');
-      
-      expect(component.basicSearchTerm).toBe('suggested');
-      expect(component.searchBasicWord).toHaveBeenCalled();
-    });
   });
 
   describe('Interactive Search Functionality', () => {
@@ -424,19 +415,6 @@ describe('AppComponent', () => {
     });
   });
 
-  describe('Tab Management', () => {
-    it('should set active tab', () => {
-      component.setActiveTab('interactive');
-      expect(component.activeTab).toBe('interactive');
-
-      component.setActiveTab('basic');
-      expect(component.activeTab).toBe('basic');
-    });
-
-    it('should start with filter tab active', () => {
-      expect(component.activeTab).toBe('filter');
-    });
-  });
 
   describe('Search Mode Management', () => {
     beforeEach(() => {
@@ -444,15 +422,15 @@ describe('AppComponent', () => {
     });
 
     it('should clear results when switching search modes', () => {
-      component.basicSearchResult = mockBasicSearchResult;
-      component.basicSearchError = 'error';
+      component.searchResult = mockBasicSearchResult;
+      component.searchError = 'error';
       component.error = 'filter error';
       component.words = mockWords;
 
       component.onSearchModeChange();
 
-      expect(component.basicSearchResult).toBeNull();
-      expect(component.basicSearchError).toBe('');
+      expect(component.searchResult).toBeNull();
+      expect(component.searchError).toBe('');
       expect(component.error).toBe('');
       expect(component.words).toEqual([]);
     });
@@ -472,13 +450,13 @@ describe('AppComponent', () => {
         total_words: 416310
       };
       wordService.addWordWithValidation.and.returnValue(of(mockAddResponse));
-      spyOn(component, 'searchBasicWord');
+      spyOn(component, 'searchWordBasic');
       spyOn(component, 'loadWordStats');
 
       component.addWordToCollection('newword');
 
       expect(wordService.addWordWithValidation).toHaveBeenCalledWith('newword');
-      expect(component.searchBasicWord).toHaveBeenCalled();
+      expect(component.searchWordBasic).toHaveBeenCalled();
       expect(component.loadWordStats).toHaveBeenCalled();
     });
 
@@ -493,7 +471,7 @@ describe('AppComponent', () => {
 
       component.addWordToCollection('invalidword');
 
-      expect(component.basicSearchError).toBe('Word is invalid');
+      expect(component.searchError).toBe('Word is invalid');
     });
 
     it('should handle word addition API error', () => {
@@ -503,7 +481,7 @@ describe('AppComponent', () => {
       component.addWordToCollection('testword');
 
       expect(console.error).toHaveBeenCalled();
-      expect(component.basicSearchError).toBe('Failed to add word to collection');
+      expect(component.searchError).toBe('Failed to add word to collection');
     });
   });
 
@@ -532,13 +510,13 @@ describe('AppComponent', () => {
     });
 
     it('should explore word', () => {
-      spyOn(component, 'searchBasicWord');
+      spyOn(component, 'searchWordBasic');
       
       component.exploreWord('explore');
       
       expect(component.searchMode).toBe('basic');
-      expect(component.basicSearchTerm).toBe('explore');
-      expect(component.searchBasicWord).toHaveBeenCalled();
+      expect(component.searchWord).toBe('explore');
+      expect(component.searchWordBasic).toHaveBeenCalled();
     });
 
     it('should play pronunciation audio', () => {
@@ -614,9 +592,9 @@ describe('AppComponent', () => {
     });
 
     it('should handle whitespace in basic search', () => {
-      component.basicSearchTerm = '  test  ';
+      component.searchWord = '  test  ';
 
-      component.searchBasicWord();
+      component.searchWordBasic();
 
       expect(wordService.searchBasicWord).toHaveBeenCalledWith('test');
     });

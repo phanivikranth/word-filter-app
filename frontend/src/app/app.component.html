@@ -1,4 +1,110 @@
 <div class="app-container slide-in">
+  <!-- Collapsible Stats Panels -->
+  <div class="stats-panels-container" *ngIf="wordStats">
+    <div class="stats-panel" 
+         [class.expanded]="statsPanelExpanded"
+         (mouseenter)="expandStatsPanel()"
+         (mouseleave)="collapseStatsPanel()">
+      
+      <!-- Collapse Button -->
+      <button class="stats-toggle-btn" 
+              (click)="toggleStatsPanel()"
+              [class.expanded]="statsPanelExpanded">
+        <span class="toggle-icon">{{ statsPanelExpanded ? '−' : '+' }}</span>
+      </button>
+      
+      <!-- Stats Content -->
+      <div class="stats-content" *ngIf="statsPanelExpanded">
+        <div class="stat-item">
+          <div class="stat-icon">📚</div>
+          <div class="stat-info">
+            <div class="stat-value">{{ wordStats.total_words | number }}</div>
+            <div class="stat-label">Total Words</div>
+          </div>
+        </div>
+        
+        <div class="stat-item">
+          <div class="stat-icon">📏</div>
+          <div class="stat-info">
+            <div class="stat-value">{{ wordStats.min_length }} - {{ wordStats.max_length }}</div>
+            <div class="stat-label">Length Range</div>
+          </div>
+        </div>
+        
+        <div class="stat-item">
+          <div class="stat-icon">⚖️</div>
+          <div class="stat-info">
+            <div class="stat-value">{{ wordStats.avg_length }}</div>
+            <div class="stat-label">Average Length</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Search Mode Toggle -->
+  <div class="search-toggle-container">
+    <div class="search-toggle-panel" 
+         [class.expanded]="searchToggleExpanded"
+         (mouseenter)="expandSearchToggle()"
+         (mouseleave)="collapseSearchToggle()">
+      
+      <!-- Toggle Switch -->
+      <div class="search-toggle-switch" 
+           (click)="toggleSearchMode()"
+           [class.basic]="searchMode === 'basic'"
+           [class.advanced]="searchMode === 'advanced'">
+        <div class="toggle-slider">
+          <div class="toggle-handle">
+            <span class="toggle-icon">{{ searchMode === 'basic' ? '📖' : '⚙️' }}</span>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Search Content -->
+      <div class="search-content" *ngIf="searchToggleExpanded">
+        <div class="search-mode-info">
+          <div class="mode-icon">{{ searchMode === 'basic' ? '📖' : '⚙️' }}</div>
+          <div class="mode-details">
+            <div class="mode-title">{{ searchMode === 'basic' ? 'Basic Search' : 'Advanced Search' }}</div>
+            <div class="mode-description">
+              {{ searchMode === 'basic' ? 'Dictionary lookup with Oxford integration' : 'Filter words using multiple criteria' }}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Puzzle Solver Toggle -->
+  <div class="puzzle-toggle-container">
+    <div class="puzzle-toggle-panel" 
+         [class.expanded]="puzzleToggleExpanded"
+         (mouseenter)="expandPuzzleToggle()"
+         (mouseleave)="collapsePuzzleToggle()">
+      
+      <!-- Circular Toggle Button -->
+      <button class="puzzle-toggle-btn" 
+              (click)="togglePuzzlePanel()"
+              [class.expanded]="puzzlePanelExpanded">
+        <span class="toggle-icon">🧩</span>
+      </button>
+      
+      <!-- Puzzle Content -->
+      <div class="puzzle-content" *ngIf="puzzleToggleExpanded">
+        <div class="puzzle-mode-info">
+          <div class="mode-icon">🧩</div>
+          <div class="mode-details">
+            <div class="mode-title">Puzzle Solver</div>
+            <div class="mode-description">
+              Interactive word pattern matching
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Hero Header -->
   <header class="hero-header">
     <div class="hero-content">
@@ -8,714 +114,319 @@
           <div class="title-tagline">Smart word filtering & puzzle solving</div>
         </h1>
       </div>
-      
-      <div class="stats-grid fade-in" *ngIf="wordStats">
-        <div class="stat-card glass-effect">
-          <div class="stat-icon">📚</div>
-          <div class="stat-content">
-            <div class="stat-value">{{ wordStats.total_words | number }}</div>
-            <div class="stat-label">Total Words</div>
-          </div>
-        </div>
-        
-        <div class="stat-card glass-effect">
-          <div class="stat-icon">📏</div>
-          <div class="stat-content">
-            <div class="stat-value">{{ wordStats.min_length }} - {{ wordStats.max_length }}</div>
-            <div class="stat-label">Length Range</div>
-          </div>
-        </div>
-        
-        <div class="stat-card glass-effect">
-          <div class="stat-icon">⚖️</div>
-          <div class="stat-content">
-            <div class="stat-value">{{ wordStats.avg_length }}</div>
-            <div class="stat-label">Average Length</div>
-          </div>
-        </div>
-      </div>
     </div>
   </header>
 
-  <!-- Navigation -->
-  <nav class="nav-container slide-in">
-    <div class="nav-tabs glass-effect">
-      <button 
-        class="nav-tab" 
-        [class.active]="activeTab === 'filter'"
-        (click)="setActiveTab('filter')">
-        <div class="tab-icon">🔍</div>
-          <div class="tab-content">
-          <div class="tab-title">Word Search</div>
-          <div class="tab-subtitle">Basic & Advanced</div>
+  <!-- Search Panels Container (Left-Right Layout) -->
+  <div class="search-panels-wrapper" *ngIf="searchMode === 'basic'">
+    <!-- Search Input Panel (Left Side) -->
+    <div class="search-input-panel">
+      <div class="search-input-container">
+        <div class="search-input-header">
+          <h3 class="search-input-title">
+            <span class="search-icon">🔍</span>
+            Word Search
+          </h3>
         </div>
-      </button>
-      
-      <button 
-        class="nav-tab" 
-        [class.active]="activeTab === 'interactive'"
-        (click)="setActiveTab('interactive')">
-        <div class="tab-icon">🧩</div>
-        <div class="tab-content">
-          <div class="tab-title">Puzzle Solver</div>
-          <div class="tab-subtitle">Interactive mode</div>
+        
+        <div class="search-form">
+          <div class="search-input-group">
+            <div class="input-wrapper">
+              <input 
+                type="text" 
+                [(ngModel)]="searchWord"
+                (input)="onSearchInput()"
+                placeholder="Enter a word to search..."
+                class="search-input">
+              <div class="input-icon">📖</div>
+            </div>
+            
+            <button 
+              type="button" 
+              (click)="searchWordBasic()"
+              [disabled]="!searchWord || searchWord.trim() === ''"
+              class="search-submit-btn">
+              <span class="btn-icon">🔍</span>
+              Search
+            </button>
+          </div>
         </div>
-      </button>
+      </div>
     </div>
-  </nav>
+
+    <!-- Search Results Panel (Right Side) -->
+    <div class="search-results-panel">
+    <div class="search-results-container">
+      <div class="results-header">
+        <h3 class="results-title">
+          <span class="results-icon">📚</span>
+          Search Results
+        </h3>
+      </div>
+      
+      <div class="results-content" *ngIf="searchResult">
+        <div class="horizontal-results-layout">
+          <!-- Definitions Card -->
+          <div class="result-card definitions-card" *ngIf="searchResult.oxford && searchResult.oxford.definitions && searchResult.oxford.definitions.length > 0">
+            <div class="card-header">
+              <h4 class="card-title">📖 Definitions</h4>
+              <div class="word-badge">{{ searchResult.word }}</div>
+            </div>
+            <div class="card-content">
+              <div class="definitions-list">
+                <div class="definition-item" *ngFor="let definition of searchResult.oxford.definitions">
+                  {{ definition }}
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Word Forms Card -->
+          <div class="result-card forms-card" *ngIf="searchResult.oxford && searchResult.oxford.word_forms && searchResult.oxford.word_forms.length > 0">
+            <div class="card-header">
+              <h4 class="card-title">🔄 Word Forms</h4>
+              <div class="word-badge">{{ searchResult.word }}</div>
+            </div>
+            <div class="card-content">
+              <div class="word-forms-list">
+                <span class="form-item" *ngFor="let form of searchResult.oxford.word_forms">{{ form }}</span>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Examples Card -->
+          <div class="result-card examples-card" *ngIf="searchResult.oxford && searchResult.oxford.examples && searchResult.oxford.examples.length > 0">
+            <div class="card-header">
+              <h4 class="card-title">💬 Examples</h4>
+              <div class="word-badge">{{ searchResult.word }}</div>
+            </div>
+            <div class="card-content">
+              <div class="examples-list">
+                <div class="example-item" *ngFor="let example of searchResult.oxford.examples">
+                  {{ example }}
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Additional Info Card -->
+          <div class="result-card info-card">
+            <div class="card-header">
+              <h4 class="card-title">📚 Additional Info</h4>
+              <div class="word-badge">{{ searchResult.word }}</div>
+            </div>
+            <div class="card-content">
+              <div class="additional-info-grid">
+                <div class="info-item">
+                  <span class="info-label">Collection Status:</span>
+                  <span class="info-value" [class.in-collection]="searchResult.inCollection">
+                    {{ searchResult.inCollection ? '✅ In Collection' : '❌ Not in Collection' }}
+                  </span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Oxford Verified:</span>
+                  <span class="info-value" [class.verified]="searchResult.oxford">
+                    {{ searchResult.oxford ? '✅ Verified' : '❌ Not Found' }}
+                  </span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Word Type:</span>
+                  <span class="info-value">Noun/Verb/Adjective</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Pronunciation:</span>
+                  <span class="info-value">/ˈwɜːrd/</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Origin:</span>
+                  <span class="info-value">Old English</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Frequency:</span>
+                  <span class="info-value">Common</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Action Button -->
+        <div class="result-actions">
+          <button 
+            type="button" 
+            (click)="addWordToCollection(searchResult.word)"
+            [disabled]="searchResult.inCollection"
+            class="btn btn-primary add-word-btn">
+            <span class="btn-icon">➕</span>
+            {{ searchResult.inCollection ? 'Already Added' : 'Add to Collection' }}
+          </button>
+        </div>
+      </div>
+      
+      <!-- No Results -->
+      <div class="no-results" *ngIf="searchResult && !searchResult.oxford && !searchResult.inCollection">
+        <div class="no-results-content">
+          <div class="no-results-icon">❌</div>
+          <h4 class="no-results-title">Word Not Found</h4>
+          <p class="no-results-message">
+            The word "{{ searchResult.word }}" was not found in our collection or Oxford Dictionary.
+          </p>
+        </div>
+      </div>
+      
+      <!-- Search Prompt -->
+      <div class="search-prompt" *ngIf="!searchResult">
+        <div class="prompt-content">
+          <div class="prompt-icon">🔍</div>
+          <h4 class="prompt-title">Search for a Word</h4>
+          <p class="prompt-message">
+            Enter a word in the search box to see detailed information displayed in organized cards.
+          </p>
+        </div>
+      </div>
+    </div>
+    </div>
+  </div>
 
   <div class="main-content">
-
-    <div class="content-panels">
-      <!-- Filter Words Tab -->
-      <div class="tab-panel slide-in" [class.active]="activeTab === 'filter'">
-        <div class="panel-container">
-          <!-- Search Type Selection -->
-          <div class="search-type-selector glass-effect fade-in">
-            <h3 class="selector-title">
-              <span class="title-icon">🎯</span>
-              Search Mode
-            </h3>
-            <div class="radio-group">
-              <label class="radio-option" [class.active]="searchMode === 'basic'">
-                <input type="radio" 
-                       value="basic" 
-                       [(ngModel)]="searchMode" 
-                       (change)="onSearchModeChange()">
-                <div class="radio-content">
-                  <div class="radio-icon">📖</div>
-                  <div class="radio-text">
-                    <div class="radio-title">Basic Search</div>
-                    <div class="radio-subtitle">Find & explore words with Oxford Dictionary</div>
-                  </div>
-                </div>
-              </label>
-              
-              <label class="radio-option" [class.active]="searchMode === 'advanced'">
-                <input type="radio" 
-                       value="advanced" 
-                       [(ngModel)]="searchMode" 
-                       (change)="onSearchModeChange()">
-                <div class="radio-content">
-                  <div class="radio-icon">⚙️</div>
-                  <div class="radio-text">
-                    <div class="radio-title">Advanced Search</div>
-                    <div class="radio-subtitle">Filter words using multiple criteria</div>
-                  </div>
-                </div>
-              </label>
-            </div>
+    <!-- Puzzle Solver Panel (shown when puzzle panel is expanded) -->
+    <div class="puzzle-solver-panel glass-effect slide-in" *ngIf="puzzlePanelExpanded">
+      <div class="panel-container">
+        <!-- Puzzle Setup Card -->
+        <div class="puzzle-card glass-effect">
+          <div class="card-header">
+            <h2 class="card-title">
+              <span class="title-icon">🧩</span>
+              Interactive Word Puzzle
+            </h2>
+            <p class="card-subtitle">Find words matching your pattern</p>
           </div>
-
-          <!-- Basic Search Card -->
-          <div class="search-card glass-effect slide-in" *ngIf="searchMode === 'basic'">
-            <div class="card-header">
-              <h2 class="card-title">
-                <span class="title-icon">📖</span>
-                Dictionary Word Search
-              </h2>
-              <p class="card-subtitle">Search for a word and explore its details</p>
-            </div>
-            
-            <div class="basic-search-form">
-              <div class="search-input-section">
-                <div class="input-group">
-                  <label for="basicSearch" class="input-label">
-                    Enter Word
-                    <span class="label-hint">Search our collection and Oxford Dictionary</span>
-                  </label>
-                  <div class="input-wrapper">
-                    <input 
-                      type="text" 
-                      id="basicSearch"
-                      [(ngModel)]="basicSearchTerm"
-                      (keydown.enter)="searchBasicWord()"
-                      [placeholder]="'e.g., amazing, fantastic, incredible'"
-                      class="modern-input"
-                      [disabled]="isBasicSearching">
-                    <div class="input-icon">🔍</div>
-                  </div>
-                </div>
-                
-                <button 
-                  type="button"
-                  (click)="searchBasicWord()"
-                  class="btn btn-primary search-btn"
-                  [disabled]="!basicSearchTerm || !basicSearchTerm.trim() || isBasicSearching">
-                  <span *ngIf="!isBasicSearching" class="btn-content">
-                    <span class="btn-icon">🔍</span>
-                    Search Word
-                  </span>
-                  <span *ngIf="isBasicSearching" class="btn-content">
-                    <div class="modern-spinner"></div>
-                    Searching...
-                  </span>
-                </button>
-              </div>
-
-              <!-- Quick Search Suggestions -->
-              <div class="search-suggestions" *ngIf="!isBasicSearching">
-                <p class="suggestions-label">Try searching for:</p>
-                <div class="suggestion-pills">
-                  <button class="suggestion-pill" (click)="searchSuggestionWord('amazing')">amazing</button>
-                  <button class="suggestion-pill" (click)="searchSuggestionWord('fantastic')">fantastic</button>
-                  <button class="suggestion-pill" (click)="searchSuggestionWord('incredible')">incredible</button>
-                  <button class="suggestion-pill" (click)="searchSuggestionWord('brilliant')">brilliant</button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Advanced Search Card -->
-          <div class="search-card glass-effect slide-in" *ngIf="searchMode === 'advanced'">
-            <div class="card-header">
-              <h2 class="card-title">
-                <span class="title-icon">⚙️</span>
-                Advanced Word Filter
-              </h2>
-              <p class="card-subtitle">Find words using multiple criteria</p>
-            </div>
-            
-            <form [formGroup]="filterForm" class="search-form">
-              <!-- Letter Filters -->
-              <div class="filter-section">
-                <h4 class="section-title">
-                  <span class="section-icon">💬</span>
-                  Letter Patterns
-                </h4>
-                <div class="input-grid">
-                  <div class="input-group">
-                    <label for="contains" class="input-label">
-                      Contains Letters
-                      <span class="label-hint">Find words containing these letters</span>
-                    </label>
-                    <div class="input-wrapper">
-                      <input 
-                        type="text" 
-                        id="contains"
-                        formControlName="contains"
-                        (input)="onFilterChange()"
-                        placeholder="e.g., 'app', 'tion'"
-                        class="modern-input">
-                      <div class="input-icon">💭</div>
-                    </div>
-                  </div>
-                  
-                  <div class="input-group">
-                    <label for="starts_with" class="input-label">
-                      Starts With
-                      <span class="label-hint">First letters of the word</span>
-                    </label>
-                    <div class="input-wrapper">
-                      <input 
-                        type="text" 
-                        id="starts_with"
-                        formControlName="starts_with"
-                        (input)="onFilterChange()"
-                        placeholder="e.g., 'pre', 'un'"
-                        class="modern-input">
-                      <div class="input-icon">▶️</div>
-                    </div>
-                  </div>
-                  
-                  <div class="input-group">
-                    <label for="ends_with" class="input-label">
-                      Ends With
-                      <span class="label-hint">Last letters of the word</span>
-                    </label>
-                    <div class="input-wrapper">
-                      <input 
-                        type="text" 
-                        id="ends_with"
-                        formControlName="ends_with"
-                        (input)="onFilterChange()"
-                        placeholder="e.g., 'ing', 'tion'"
-                        class="modern-input">
-                      <div class="input-icon">◀️</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Length Filters -->
-              <div class="filter-section">
-                <h4 class="section-title">
-                  <span class="section-icon">📏</span>
+          
+          <div class="puzzle-form">
+            <div class="puzzle-inputs">
+              <div class="input-group">
+                <label for="puzzleLength" class="input-label">
                   Word Length
-                </h4>
-                <div class="input-grid">
-                  <div class="input-group">
-                    <label for="exact_length" class="input-label">
-                      Exact Length
-                      <span class="label-hint">Specific number of letters</span>
-                    </label>
-                    <div class="input-wrapper">
-                      <input 
-                        type="number" 
-                        id="exact_length"
-                        formControlName="exact_length"
-                        (input)="onFilterChange()"
-                        min="1"
-                        placeholder="e.g., 5"
-                        class="modern-input">
-                      <div class="input-icon">🎯</div>
-                    </div>
-                  </div>
-                  
-                  <div class="input-group">
-                    <label for="min_length" class="input-label">
-                      Minimum Length
-                      <span class="label-hint">At least this many letters</span>
-                    </label>
-                    <div class="input-wrapper">
-                      <input 
-                        type="number" 
-                        id="min_length"
-                        formControlName="min_length"
-                        (input)="onFilterChange()"
-                        min="1"
-                        placeholder="e.g., 3"
-                        class="modern-input">
-                      <div class="input-icon">⬆️</div>
-                    </div>
-                  </div>
-                  
-                  <div class="input-group">
-                    <label for="max_length" class="input-label">
-                      Maximum Length
-                      <span class="label-hint">No more than this many letters</span>
-                    </label>
-                    <div class="input-wrapper">
-                      <input 
-                        type="number" 
-                        id="max_length"
-                        formControlName="max_length"
-                        (input)="onFilterChange()"
-                        min="1"
-                        placeholder="e.g., 10"
-                        class="modern-input">
-                      <div class="input-icon">⬇️</div>
-                    </div>
-                  </div>
-                  
-                  <div class="input-group">
-                    <label for="limit" class="input-label">
-                      Max Results
-                      <span class="label-hint">Limit number of results</span>
-                    </label>
-                    <div class="input-wrapper">
-                      <input 
-                        type="number" 
-                        id="limit"
-                        formControlName="limit"
-                        (input)="onFilterChange()"
-                        min="1"
-                        max="1000"
-                        placeholder="100"
-                        class="modern-input">
-                      <div class="input-icon">🔢</div>
-                    </div>
-                  </div>
+                  <span class="label-hint">Number of letters in the word</span>
+                </label>
+                <div class="input-wrapper">
+                  <input 
+                    type="number" 
+                    id="puzzleLength"
+                    [(ngModel)]="puzzleLength"
+                    (input)="onPuzzleLengthChange()"
+                    min="1"
+                    max="20"
+                    placeholder="5"
+                    class="modern-input">
+                  <div class="input-icon">📏</div>
                 </div>
               </div>
-
-              <!-- Action Buttons -->
-              <div class="form-actions">
-                <button type="button" (click)="searchWords()" class="btn btn-primary">
-                  <span class="btn-icon">🚀</span>
-                  Search Words
-                </button>
-                <button type="button" (click)="clearFilters()" class="btn btn-secondary">
-                  <span class="btn-icon">🧹</span>
-                  Clear All
-                </button>
-              </div>
-            </form>
-          </div>
-
-          <!-- Basic Search Results -->
-          <div class="results-card glass-effect slide-in" *ngIf="searchMode === 'basic' && (isBasicSearching || basicSearchResult || basicSearchError)">
-            <div class="results-header">
-              <h3 class="results-title">
-                <span class="title-icon">📖</span>
-                Dictionary Results
-              </h3>
-              <div class="result-badge" *ngIf="!isBasicSearching && basicSearchResult">
-                <span class="badge-icon">✨</span>
-                <span class="badge-label">Word Details</span>
-              </div>
-            </div>
-
-            <!-- Basic Search Loading -->
-            <div class="loading-container" *ngIf="isBasicSearching">
-              <div class="modern-spinner">
-                <div class="spinner-ring"></div>
-                <div class="spinner-ring"></div>
-                <div class="spinner-ring"></div>
-              </div>
-              <div class="loading-content">
-                <h4 class="loading-title">Exploring Word</h4>
-                <p class="loading-subtitle">Searching collection and Oxford Dictionary...</p>
-              </div>
-            </div>
-
-            <!-- Basic Search Error -->
-            <div class="error-container" *ngIf="basicSearchError">
-              <div class="error-icon">⚠️</div>
-              <div class="error-content">
-                <h4 class="error-title">Search Failed</h4>
-                <p class="error-message">{{ basicSearchError }}</p>
-                <button class="btn btn-outline" (click)="searchBasicWord()">
-                  <span class="btn-icon">🔄</span>
-                  Try Again
-                </button>
-              </div>
-            </div>
-
-            <!-- Dictionary Word Details -->
-            <div class="word-details-container" *ngIf="!isBasicSearching && !basicSearchError && basicSearchResult">
-              <!-- Word Header -->
-              <div class="word-header-section glass-effect">
-                <div class="word-title-group">
-                  <h2 class="word-title">{{ basicSearchResult.word }}</h2>
-                  <div class="word-status-badges">
-                    <span class="status-badge" [class.found]="basicSearchResult.inCollection" [class.not-found]="!basicSearchResult.inCollection">
-                      <span class="badge-icon">{{ basicSearchResult.inCollection ? '✅' : '❌' }}</span>
-                      {{ basicSearchResult.inCollection ? 'In Collection' : 'Not in Collection' }}
-                    </span>
-                    <span class="status-badge oxford" *ngIf="basicSearchResult.oxford?.is_valid">
-                      <span class="badge-icon">📚</span>
-                      Oxford Verified
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Pronunciation Section -->
-              <div class="detail-section" *ngIf="basicSearchResult.oxford?.pronunciations?.length">
-                <h4 class="section-header">
-                  <span class="section-icon">🔊</span>
-                  Pronunciation
-                </h4>
-                <div class="pronunciation-list">
-                  <div class="pronunciation-item" *ngFor="let pron of basicSearchResult.oxford!.pronunciations">
-                    <span class="pronunciation-accent">{{ pron.prefix }}</span>
-                    <span class="pronunciation-ipa">/{{ pron.ipa }}/</span>
-                    <button class="pronunciation-play" *ngIf="pron.url" (click)="playPronunciation(pron.url)">
-                      <span class="play-icon">🔊</span>
-                      Play
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Word Forms Section -->
-              <div class="detail-section" *ngIf="basicSearchResult.oxford?.word_forms?.length">
-                <h4 class="section-header">
-                  <span class="section-icon">📝</span>
-                  Word Forms
-                </h4>
-                <div class="word-forms-list">
-                  <span class="word-form-tag" *ngFor="let form of basicSearchResult.oxford!.word_forms">
-                    {{ form }}
-                  </span>
-                </div>
-              </div>
-
-              <!-- Definitions Section -->
-              <div class="detail-section" *ngIf="basicSearchResult.oxford?.definitions?.length">
-                <h4 class="section-header">
-                  <span class="section-icon">📚</span>
-                  Definitions
-                </h4>
-                <div class="definitions-list">
-                  <div class="definition-item" *ngFor="let definition of basicSearchResult.oxford!.definitions; let i = index">
-                    <div class="definition-number">{{ i + 1 }}</div>
-                    <div class="definition-text">{{ definition }}</div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Examples Section -->
-              <div class="detail-section" *ngIf="basicSearchResult.oxford?.examples?.length">
-                <h4 class="section-header">
-                  <span class="section-icon">💡</span>
-                  Examples
-                </h4>
-                <div class="examples-list">
-                  <div class="example-item" *ngFor="let example of basicSearchResult.oxford!.examples!.slice(0, 5)">
-                    <span class="example-bullet">•</span>
-                    <span class="example-text">{{ example }}</span>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Collection Info -->
-              <div class="detail-section collection-info">
-                <h4 class="section-header">
-                  <span class="section-icon">📦</span>
-                  Collection Status
-                </h4>
-                <div class="collection-status">
-                  <p *ngIf="basicSearchResult.inCollection" class="status-message success">
-                    ✅ This word is available in our word puzzle collection.
-                  </p>
-                  <p *ngIf="!basicSearchResult.inCollection && basicSearchResult.oxford?.is_valid" class="status-message info">
-                    📝 This is a valid dictionary word but not yet in our collection.
-                    <button class="btn btn-small btn-outline" (click)="addWordToCollection(basicSearchResult.word)">
-                      <span class="btn-icon">➕</span>
-                      Add to Collection
-                    </button>
-                  </p>
-                  <p *ngIf="!basicSearchResult.oxford?.is_valid" class="status-message warning">
-                    ⚠️ This word was not found in Oxford Dictionary.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-          </div>
-
-          <!-- Advanced Search Results -->
-          <div class="results-card glass-effect slide-in" *ngIf="searchMode === 'advanced'">
-            <div class="results-header">
-              <h3 class="results-title">
-                <span class="title-icon">✨</span>
-                Filter Results
-              </h3>
-              <div class="result-badge" *ngIf="!loading && words.length > 0">
-                <span class="badge-count">{{ words.length | number }}</span>
-                <span class="badge-label">words found</span>
-              </div>
-            </div>
-
-            <!-- Advanced Search Loading -->
-            <div class="loading-container" *ngIf="loading">
-              <div class="modern-spinner">
-                <div class="spinner-ring"></div>
-                <div class="spinner-ring"></div>
-                <div class="spinner-ring"></div>
-              </div>
-              <div class="loading-content">
-                <h4 class="loading-title">Filtering Words</h4>
-                <p class="loading-subtitle">Finding the perfect matches...</p>
-              </div>
-            </div>
-
-            <!-- Advanced Search Error -->
-            <div class="error-container" *ngIf="error">
-              <div class="error-icon">⚠️</div>
-              <div class="error-content">
-                <h4 class="error-title">Something went wrong</h4>
-                <p class="error-message">{{ error }}</p>
-                <button class="btn btn-outline" (click)="searchWords()">
-                  <span class="btn-icon">🔄</span>
-                  Try Again
-                </button>
-              </div>
-            </div>
-
-            <!-- Advanced Results Grid -->
-            <div class="modern-words-grid" *ngIf="!loading && !error && words.length > 0">
-              <div class="word-card" 
-                   *ngFor="let word of words; let i = index; trackBy: trackByWord"
-                   [style.animation-delay]="(i * 50) + 'ms'">
-                <div class="word-content">
-                  <span class="word-text">{{ word }}</span>
-                  <span class="word-meta">{{ word.length }} letters</span>
-                </div>
-                <div class="word-actions">
-                  <button class="word-action" title="Copy word" (click)="copyWordToClipboard(word)">📋</button>
-                  <button class="word-action" title="Explore word" (click)="exploreWord(word)">ℹ️</button>
-                </div>
-              </div>
-            </div>
-
-            <!-- Advanced Search Empty State -->
-            <div class="empty-state" *ngIf="!loading && !error && words.length === 0 && searchMode === 'advanced'">
-              <div class="empty-icon">🔍</div>
-              <div class="empty-content">
-                <h4 class="empty-title">No words found</h4>
-                <p class="empty-subtitle">Try adjusting your search criteria</p>
-                <div class="empty-suggestions">
-                  <p>Suggestions:</p>
-                  <ul>
-                    <li>• Use fewer filters</li>
-                    <li>• Try different letter combinations</li>
-                    <li>• Increase the length range</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Interactive Puzzle Tab -->
-      <div class="tab-panel slide-in" [class.active]="activeTab === 'interactive'">
-        <div class="panel-container">
-          <!-- Puzzle Setup Card -->
-          <div class="puzzle-card glass-effect">
-            <div class="card-header">
-              <h2 class="card-title">
-                <span class="title-icon">🧩</span>
-                Interactive Word Puzzle
-              </h2>
-              <p class="card-subtitle">Solve crossword clues and word patterns</p>
-            </div>
-            
-            <!-- Word Length Input -->
-            <div class="length-section">
-              <h4 class="section-title">
-                <span class="section-icon">📐</span>
-                Set Word Length
-              </h4>
-              <div class="length-input-wrapper">
-                <div class="input-group">
-                  <label for="wordLength" class="input-label">
-                    Expected Word Length
-                    <span class="label-hint">How many letters in the word?</span>
-                  </label>
-                  <div class="input-wrapper special">
-                    <input 
-                      type="number" 
-                      id="wordLength"
-                      [(ngModel)]="interactiveWordLength"
-                      (input)="onWordLengthChange()"
-                      min="2"
-                      max="20"
-                      placeholder="e.g., 4"
-                      class="modern-input length-input">
-                    <div class="input-icon">📏</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Letter Pattern Section -->
-            <div class="pattern-section" *ngIf="letterBoxes.length > 0">
-              <h4 class="section-title">
-                <span class="section-icon">🔤</span>
-                Enter Known Letters
-              </h4>
-              <p class="pattern-instruction">Fill in the letters you know. Leave empty for unknown positions.</p>
               
-              <div class="letter-grid">
-                <div class="letter-position" 
-                     *ngFor="let box of letterBoxes; let i = index; trackBy: trackByIndex"
-                     [style.animation-delay]="(i * 100) + 'ms'">
-                  <div class="position-label">{{ i + 1 }}</div>
+              <div class="input-group">
+                <label for="puzzlePattern" class="input-label">
+                  Pattern
+                  <span class="label-hint">Use ? for unknown letters (e.g., ?a???)</span>
+                </label>
+                <div class="input-wrapper">
                   <input 
                     type="text" 
-                    maxlength="1"
-                    class="letter-slot"
-                    [value]="letterBoxes[i] ? letterBoxes[i].toUpperCase() : ''"
-                    (input)="updateLetter(i, $event)"
-                    (focus)="highlightPosition(i)"
-                    (blur)="unhighlightPosition(i)"
-                    placeholder="?"
-                    [attr.aria-label]="'Letter position ' + (i + 1)">
+                    id="puzzlePattern"
+                    [(ngModel)]="puzzlePattern"
+                    (input)="onPuzzlePatternChange()"
+                    [placeholder]="'e.g., ' + getPatternPlaceholder()"
+                    class="modern-input">
+                  <div class="input-icon">🎯</div>
                 </div>
               </div>
+            </div>
+            
+            <div class="puzzle-actions">
+              <button type="button" (click)="findMatchingWords()" class="btn btn-primary">
+                <span class="btn-icon">🔍</span>
+                Find Words Matching Pattern
+              </button>
+              <button type="button" (click)="clearInteractive()" class="btn btn-secondary">
+                <span class="btn-icon">🗑️</span>
+                Clear All & Start Over
+              </button>
+              <button type="button" (click)="randomizePattern()" class="btn btn-accent">
+                <span class="btn-icon">🎲</span>
+                Generate Random Puzzle
+              </button>
+            </div>
+          </div>
+        </div>
 
-              <!-- Action Buttons -->
-              <div class="puzzle-actions">
-                <button type="button" (click)="findMatchingWords()" class="btn btn-primary">
-                  <span class="btn-icon">🔍</span>
-                  Find Words Matching Pattern
-                </button>
-                <button type="button" (click)="clearInteractive()" class="btn btn-secondary">
-                  <span class="btn-icon">🗑️</span>
-                  Clear All & Start Over
-                </button>
-                <button type="button" (click)="randomizePattern()" class="btn btn-accent">
-                  <span class="btn-icon">🎲</span>
-                  Generate Random Puzzle
-                </button>
+        <!-- Puzzle Results -->
+        <div class="puzzle-results-card glass-effect" *ngIf="letterBoxes.length > 0">
+          <div class="card-header">
+            <h3 class="card-title">
+              <span class="title-icon">🎯</span>
+              Puzzle Results
+            </h3>
+            <div class="result-badge" *ngIf="!interactiveLoading && !interactiveError && interactiveWords.length > 0">
+              <span class="badge-icon">✨</span>
+              <span class="badge-label">{{ interactiveWords.length }} words found</span>
+            </div>
+          </div>
+
+          <!-- Interactive Loading -->
+          <div class="loading-container" *ngIf="interactiveLoading">
+            <div class="modern-spinner">
+              <div class="spinner-ring puzzle"></div>
+              <div class="spinner-ring puzzle"></div>
+              <div class="spinner-ring puzzle"></div>
+            </div>
+            <div class="loading-content">
+              <h4 class="loading-title">Solving Puzzle</h4>
+              <p class="loading-subtitle">Finding words matching your pattern...</p>
+            </div>
+          </div>
+
+          <!-- Interactive Error -->
+          <div class="error-container" *ngIf="interactiveError">
+            <div class="error-content">
+              <h4 class="error-title">Puzzle Error</h4>
+              <p class="error-message">{{ interactiveError }}</p>
+              <button class="btn btn-outline" (click)="findMatchingWords()">
+                <span class="btn-icon">🔄</span>
+                Try Again
+              </button>
+            </div>
+          </div>
+
+          <!-- Interactive Words Grid -->
+          <div class="puzzle-words-grid" *ngIf="!interactiveLoading && !interactiveError && interactiveWords.length > 0">
+            <div class="puzzle-word-card" *ngFor="let word of interactiveWords; trackBy: trackByWord">
+              <div class="word-content">
+                <span class="word-text">{{ word }}</span>
+                <span class="word-length">{{ word.length }}</span>
               </div>
             </div>
           </div>
 
-          <!-- Puzzle Results -->
-          <div class="puzzle-results-card glass-effect" *ngIf="letterBoxes.length > 0">
-            <div class="results-header">
-              <h3 class="results-title">
-                <span class="title-icon">💡</span>
-                Possible Solutions
-              </h3>
-              <div class="result-badge" *ngIf="!interactiveLoading && interactiveWords.length > 0">
-                <span class="badge-count">{{ interactiveWords.length | number }}</span>
-                <span class="badge-label">matches</span>
-              </div>
-            </div>
-
-            <!-- Loading State -->
-            <div class="loading-container" *ngIf="interactiveLoading">
-              <div class="modern-spinner">
-                <div class="spinner-ring puzzle"></div>
-                <div class="spinner-ring puzzle"></div>
-                <div class="spinner-ring puzzle"></div>
-              </div>
-              <div class="loading-content">
-                <h4 class="loading-title">Solving Puzzle</h4>
-                <p class="loading-subtitle">Analyzing letter patterns...</p>
-              </div>
-            </div>
-
-            <!-- Error State -->
-            <div class="error-container" *ngIf="interactiveError">
-              <div class="error-icon">🤔</div>
-              <div class="error-content">
-                <h4 class="error-title">Puzzle Error</h4>
-                <p class="error-message">{{ interactiveError }}</p>
-                <button class="btn btn-outline" (click)="findMatchingWords()">
-                  <span class="btn-icon">🔄</span>
-                  Try Again
-                </button>
-              </div>
-            </div>
-
-            <!-- Results Grid -->
-            <div class="puzzle-words-grid" *ngIf="!interactiveLoading && !interactiveError && interactiveWords.length > 0">
-              <div class="solution-card" 
-                   *ngFor="let word of interactiveWords; let i = index; trackBy: trackByWord"
-                   [style.animation-delay]="(i * 75) + 'ms'">
-                <div class="solution-word">{{ word }}</div>
-                <div class="solution-pattern">
-                  <span class="pattern-letter" 
-                        *ngFor="let letter of word.split(''); let j = index"
-                        [class.known]="letterBoxes[j] && letterBoxes[j].toLowerCase() === letter.toLowerCase()"
-                        [class.unknown]="!letterBoxes[j] || letterBoxes[j] === ''">
-                    {{ letter }}
-                  </span>
-                </div>
-                <div class="solution-actions">
-                  <button class="solution-action" title="Copy solution">📋</button>
-                  <button class="solution-action" title="Use as template">📝</button>
-                </div>
-              </div>
-            </div>
-
-            <!-- Empty State -->
-            <div class="empty-state" *ngIf="!interactiveLoading && !interactiveError && interactiveWords.length === 0 && letterBoxes.length > 0">
-              <div class="empty-icon">🤷‍♂️</div>
-              <div class="empty-content">
-                <h4 class="empty-title">No matches found</h4>
-                <p class="empty-subtitle">No words match this pattern</p>
-                <div class="empty-suggestions">
-                  <p>Try:</p>
-                  <ul>
-                    <li>• Remove some letters</li>
-                    <li>• Check letter positions</li>
-                    <li>• Try a different word length</li>
-                  </ul>
-                </div>
+          <!-- No Interactive Results -->
+          <div class="no-results" *ngIf="!interactiveLoading && !interactiveError && interactiveWords.length === 0 && letterBoxes.length > 0">
+            <div class="no-results-content">
+              <div class="no-results-icon">🧩</div>
+              <h4 class="no-results-title">No Words Found</h4>
+              <p class="no-results-message">
+                No words match your current pattern. Try adjusting your pattern or word length.
+              </p>
+              <div class="no-results-suggestions">
+                <h5>Suggestions:</h5>
+                <ul>
+                  <li>• Use more ? wildcards in your pattern</li>
+                  <li>• Try a different word length</li>
+                  <li>• Check if your known letters are correct</li>
+                  <li>• Try a different combination</li>
+                </ul>
               </div>
             </div>
           </div>
         </div>
       </div>
-
     </div>
   </div>
 </div>

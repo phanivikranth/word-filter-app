@@ -177,10 +177,10 @@ describe('AppComponent Integration Tests', () => {
     });
 
     it('should perform complete basic search workflow', async () => {
-      component.basicSearchTerm = 'example';
+      component.searchWord = 'example';
 
       // Trigger search
-      component.searchBasicWord();
+      component.searchWordBasic();
 
       // Handle collection check
       const checkReq = httpMock.expectOne(`${environment.apiUrl}/words/check`);
@@ -195,16 +195,16 @@ describe('AppComponent Integration Tests', () => {
         message: 'Word validated'
       });
 
-      await AsyncTestHelper.waitForPropertyChange(component, 'isBasicSearching', false);
+      await AsyncTestHelper.waitForPropertyChange(component, 'isSearching', false);
 
-      expect(component.basicSearchResult).toEqual(MOCK_BASIC_SEARCH_RESULT);
-      expect(component.basicSearchError).toBe('');
+      expect(component.searchResult).toEqual(MOCK_BASIC_SEARCH_RESULT);
+      expect(component.searchError).toBe('');
     });
 
     it('should handle word not in collection scenario', async () => {
-      component.basicSearchTerm = 'uncommon';
+      component.searchWord = 'uncommon';
 
-      component.searchBasicWord();
+      component.searchWordBasic();
 
       // Collection check returns false
       const checkReq = httpMock.expectOne(`${environment.apiUrl}/words/check`);
@@ -222,16 +222,16 @@ describe('AppComponent Integration Tests', () => {
         message: 'Word validated'
       });
 
-      await AsyncTestHelper.waitForPropertyChange(component, 'isBasicSearching', false);
+      await AsyncTestHelper.waitForPropertyChange(component, 'isSearching', false);
 
-      expect(component.basicSearchResult?.inCollection).toBeFalse();
-      expect(component.basicSearchResult?.oxford).toBeTruthy();
+      expect(component.searchResult?.inCollection).toBeFalse();
+      expect(component.searchResult?.oxford).toBeTruthy();
     });
 
     it('should fallback to filtered search when check endpoint fails', async () => {
-      component.basicSearchTerm = 'fallback';
+      component.searchWord = 'fallback';
 
-      component.searchBasicWord();
+      component.searchWordBasic();
 
       // Collection check fails
       const checkReq = httpMock.expectOne(`${environment.apiUrl}/words/check`);
@@ -257,10 +257,10 @@ describe('AppComponent Integration Tests', () => {
         message: 'Success'
       });
 
-      await AsyncTestHelper.waitForPropertyChange(component, 'isBasicSearching', false);
+      await AsyncTestHelper.waitForPropertyChange(component, 'isSearching', false);
 
-      expect(component.basicSearchResult?.inCollection).toBeTruthy();
-      expect(component.basicSearchResult?.oxford).toBeTruthy();
+      expect(component.searchResult?.inCollection).toBeTruthy();
+      expect(component.searchResult?.oxford).toBeTruthy();
     });
   });
 
@@ -359,9 +359,9 @@ describe('AppComponent Integration Tests', () => {
         message: 'Invalid word format'
       });
 
-      await AsyncTestHelper.waitFor(() => component.basicSearchError !== '');
+      await AsyncTestHelper.waitFor(() => component.searchError !== '');
 
-      expect(component.basicSearchError).toBe('Invalid word format');
+      expect(component.searchError).toBe('Invalid word format');
     });
   });
 
@@ -387,16 +387,16 @@ describe('AppComponent Integration Tests', () => {
     });
 
     it('should handle server errors gracefully', async () => {
-      component.basicSearchTerm = 'test';
+      component.searchWord = 'test';
       
       // Initially, search should not be in progress
-      expect(component.isBasicSearching).toBeFalse();
+      expect(component.isSearching).toBeFalse();
       
-      // Start the search (this sets isBasicSearching to true)
-      component.searchBasicWord();
+      // Start the search (this sets isSearching to true)
+      component.searchWordBasic();
       
       // Search should now be in progress
-      expect(component.isBasicSearching).toBeTrue();
+      expect(component.isSearching).toBeTrue();
 
       // Mock the first HTTP error response (POST /words/check)
       const checkReq = httpMock.expectOne(req => 
@@ -414,8 +414,8 @@ describe('AppComponent Integration Tests', () => {
       await new Promise(resolve => setTimeout(resolve, 250));
 
       // After error handling, search should no longer be in progress
-      expect(component.isBasicSearching).toBeFalse();
-      expect(component.basicSearchError).toContain('Failed to search word');
+      expect(component.isSearching).toBeFalse();
+      expect(component.searchError).toContain('Failed to search word');
     });
 
     it('should handle timeout scenarios', async () => {
@@ -486,8 +486,8 @@ describe('AppComponent Integration Tests', () => {
     it('should complete basic search to word addition workflow', async () => {
       // User searches for a word
       component.searchMode = 'basic';
-      component.basicSearchTerm = 'newword';
-      component.searchBasicWord();
+      component.searchWord = 'newword';
+      component.searchWordBasic();
 
       // Word is not in collection
       const checkReq = httpMock.expectOne(`${environment.apiUrl}/words/check`);
@@ -502,10 +502,10 @@ describe('AppComponent Integration Tests', () => {
         message: 'Valid word'
       });
 
-      await AsyncTestHelper.waitForPropertyChange(component, 'isBasicSearching', false);
+      await AsyncTestHelper.waitForPropertyChange(component, 'isSearching', false);
 
-      expect(component.basicSearchResult?.inCollection).toBeFalse();
-      expect(component.basicSearchResult?.oxford).toBeTruthy();
+      expect(component.searchResult?.inCollection).toBeFalse();
+      expect(component.searchResult?.oxford).toBeTruthy();
 
       // User decides to add the word
       component.addWordToCollection('newword');
@@ -535,10 +535,10 @@ describe('AppComponent Integration Tests', () => {
       const statsReq = httpMock.expectOne(`${environment.apiUrl}/words/stats`);
       statsReq.flush({ ...MOCK_WORD_STATS, total_words: MOCK_WORD_STATS.total_words + 1 });
 
-      await AsyncTestHelper.waitForPropertyTruthy(component, 'basicSearchResult');
+      await AsyncTestHelper.waitForPropertyTruthy(component, 'searchResult');
 
       // Verify word is now in collection
-      expect(component.basicSearchResult?.inCollection).toBeTruthy();
+      expect(component.searchResult?.inCollection).toBeTruthy();
       expect(component.wordStats?.total_words).toBe(MOCK_WORD_STATS.total_words + 1);
     });
 
@@ -570,7 +570,7 @@ describe('AppComponent Integration Tests', () => {
       component.exploreWord('phone');
 
       expect(component.searchMode).toBe('basic');
-      expect(component.basicSearchTerm).toBe('phone');
+      expect(component.searchWord).toBe('phone');
 
       // System performs basic search for the explored word
       const exploreCheckReq = httpMock.expectOne(`${environment.apiUrl}/words/check`);
@@ -584,10 +584,10 @@ describe('AppComponent Integration Tests', () => {
         message: 'Success'
       });
 
-      await AsyncTestHelper.waitForPropertyChange(component, 'isBasicSearching', false);
+      await AsyncTestHelper.waitForPropertyChange(component, 'isSearching', false);
 
-      expect(component.basicSearchResult?.word).toBe('phone');
-      expect(component.basicSearchResult?.inCollection).toBeTruthy();
+      expect(component.searchResult?.word).toBe('phone');
+      expect(component.searchResult?.inCollection).toBeTruthy();
     });
   });
 });

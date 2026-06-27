@@ -115,6 +115,7 @@ export class AppComponent implements OnInit, OnDestroy {
   performanceStatsVisible = false;
   telemetryLoading = false;
   telemetryError = '';
+  isClaymorphic = false;
 
   // Daily puzzle solver properties
   puzzleGuess = '';
@@ -160,6 +161,10 @@ export class AppComponent implements OnInit, OnDestroy {
     if (this.isDarkMode) {
       document.documentElement.classList.add('dark');
     }
+
+    // Load saved design style
+    this.isClaymorphic = localStorage.getItem('isClaymorphic') === 'true';
+    this.updateDesignClass();
 
     // Load active theme
     const savedTheme = localStorage.getItem('activeTheme') || 'blue';
@@ -1065,6 +1070,25 @@ export class AppComponent implements OnInit, OnDestroy {
       document.documentElement.classList.add(selected.cssClass);
     }
     localStorage.setItem('activeFont', fontId);
+  }
+
+  toggleClaymorphic() {
+    this.isClaymorphic = !this.isClaymorphic;
+    localStorage.setItem('isClaymorphic', String(this.isClaymorphic));
+    this.updateDesignClass();
+    this.showNotification(
+      `Switched to ${this.isClaymorphic ? 'Claymorphic' : 'Normal'} style`,
+      'success'
+    );
+  }
+
+  updateDesignClass() {
+    const root = document.documentElement;
+    if (this.isClaymorphic) {
+      root.classList.add('design-clay');
+    } else {
+      root.classList.remove('design-clay');
+    }
   }
 
   saveProfileName(name: string) {

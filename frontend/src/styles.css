@@ -807,3 +807,246 @@ body, .mat-typography, h1, h2, h3, h4, .font-display-lg, .font-headline-lg, .fon
 .shadow-themed-primary:hover {
   box-shadow: 0 6px 20px 0 color-mix(in srgb, var(--primary) 30%, transparent) !important;
 }
+
+/* ==========================================
+   CLAYMORPHISM DESIGN SYSTEM
+   ========================================== */
+
+/* 1. Cards styling */
+.clay-card {
+  background-color: var(--surface-container-lowest) !important;
+  border: 1px solid var(--outline-variant) !important;
+  border-radius: 20px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02) !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.dark .clay-card {
+  background-color: var(--surface-container-low) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+}
+
+/* Claymorphic Card overrides */
+.design-clay .clay-card {
+  border-radius: 24px !important;
+  box-shadow: 
+    0 12px 28px -5px rgba(0, 0, 0, 0.05),
+    0 8px 12px -6px rgba(0, 0, 0, 0.05),
+    inset 3px 3px 6px rgba(255, 255, 255, 0.7),
+    inset -3px -3px 6px rgba(0, 0, 0, 0.08) !important;
+}
+.design-clay.dark .clay-card,
+.design-clay .dark .clay-card {
+  box-shadow: 
+    0 12px 28px -5px rgba(0, 0, 0, 0.25),
+    0 8px 12px -6px rgba(0, 0, 0, 0.25),
+    inset 3px 3px 6px rgba(255, 255, 255, 0.06),
+    inset -3px -3px 6px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* 2. Inputs styling */
+.clay-input {
+  border-radius: 14px !important;
+  background-color: var(--background) !important;
+  border: 1px solid var(--outline-variant) !important;
+  box-shadow: none !important;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.clay-input:focus {
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 3px var(--primary-container) !important;
+}
+.dark .clay-input:focus {
+  box-shadow: 0 0 0 3px rgba(21, 101, 192, 0.2) !important;
+}
+
+/* Claymorphic Input overrides */
+.design-clay .clay-input {
+  border-radius: 16px !important;
+  box-shadow: 
+    inset 3px 3px 6px rgba(0, 0, 0, 0.06),
+    inset -3px -3px 6px rgba(255, 255, 255, 0.6) !important;
+}
+.design-clay.dark .clay-input,
+.design-clay .dark .clay-input {
+  box-shadow: 
+    inset 3px 3px 6px rgba(0, 0, 0, 0.25),
+    inset -3px -3px 6px rgba(255, 255, 255, 0.04) !important;
+}
+.design-clay .clay-input:focus {
+  box-shadow: 
+    0 0 0 4px var(--primary-container),
+    inset 3px 3px 6px rgba(0, 0, 0, 0.06),
+    inset -3px -3px 6px rgba(255, 255, 255, 0.6) !important;
+}
+.design-clay.dark .clay-input:focus,
+.design-clay .dark .clay-input:focus {
+  box-shadow: 
+    0 0 0 4px rgba(21, 101, 192, 0.2),
+    inset 3px 3px 6px rgba(0, 0, 0, 0.25),
+    inset -3px -3px 6px rgba(255, 255, 255, 0.04) !important;
+}
+
+/* 3. Buttons styling */
+.clay-btn {
+  border-radius: 14px !important;
+  border: 1px solid var(--outline-variant) !important;
+  background-color: var(--surface-container-high) !important;
+  color: var(--on-surface) !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02) !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.clay-btn:hover {
+  background-color: var(--surface-container-highest) !important;
+  transform: translateY(-1px);
+}
+.clay-btn:active {
+  transform: translateY(0);
+}
+
+/* Claymorphic Button overrides */
+.design-clay .clay-btn {
+  border-radius: 16px !important;
+  box-shadow: 
+    0 6px 12px rgba(0, 0, 0, 0.04),
+    inset 2px 2px 4px rgba(255, 255, 255, 0.5),
+    inset -2px -2px 4px rgba(0, 0, 0, 0.1) !important;
+}
+.design-clay.dark .clay-btn,
+.design-clay .dark .clay-btn {
+  box-shadow: 
+    0 6px 12px rgba(0, 0, 0, 0.2),
+    inset 2px 2px 4px rgba(255, 255, 255, 0.08),
+    inset -2px -2px 4px rgba(0, 0, 0, 0.2) !important;
+}
+.design-clay .clay-btn:hover {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 
+    0 8px 16px rgba(0, 0, 0, 0.06),
+    inset 2px 2px 4px rgba(255, 255, 255, 0.6),
+    inset -2px -2px 4px rgba(0, 0, 0, 0.08) !important;
+}
+.design-clay .clay-btn:active {
+  transform: translateY(1px) scale(0.98);
+  box-shadow: 
+    0 2px 4px rgba(0, 0, 0, 0.04),
+    inset 1px 1px 2px rgba(255, 255, 255, 0.4),
+    inset -1px -1px 2px rgba(0, 0, 0, 0.12) !important;
+}
+
+/* 4. Primary themed buttons */
+.clay-primary {
+  background-color: var(--primary) !important;
+  color: var(--on-primary) !important;
+  border: none !important;
+  border-radius: 14px !important;
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--primary) 12%, transparent) !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.clay-primary:hover {
+  background-color: var(--primary) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--primary) 20%, transparent) !important;
+}
+.clay-primary:active {
+  transform: translateY(0);
+}
+
+/* Claymorphic Primary overrides */
+.design-clay .clay-primary {
+  border-radius: 16px !important;
+  box-shadow: 
+    0 6px 16px color-mix(in srgb, var(--primary) 25%, transparent),
+    inset 3px 3px 6px rgba(255, 255, 255, 0.35),
+    inset -3px -3px 6px rgba(0, 0, 0, 0.2) !important;
+}
+.design-clay .clay-primary:hover {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 
+    0 8px 20px color-mix(in srgb, var(--primary) 35%, transparent),
+    inset 3px 3px 6px rgba(255, 255, 255, 0.45),
+    inset -3px -3px 6px rgba(0, 0, 0, 0.15) !important;
+}
+.design-clay .clay-primary:active {
+  transform: translateY(1px) scale(0.98);
+  box-shadow: 
+    0 3px 8px color-mix(in srgb, var(--primary) 20%, transparent),
+    inset 2px 2px 4px rgba(255, 255, 255, 0.3),
+    inset -2px -2px 4px rgba(0, 0, 0, 0.25) !important;
+}
+
+/* 5. Floating navbar overrides for Claymorphic Mode */
+.design-clay .frosted-navbar {
+  background-color: color-mix(in srgb, var(--surface) 92%, transparent) !important;
+  border-radius: 20px !important;
+  margin-top: 12px;
+  margin-left: 12px;
+  margin-right: 12px;
+  box-shadow: 
+    0 8px 24px -5px rgba(0, 0, 0, 0.04),
+    inset 2px 2px 4px rgba(255, 255, 255, 0.6),
+    inset -2px -2px 4px rgba(0, 0, 0, 0.08) !important;
+  border: 1px solid var(--outline-variant) !important;
+}
+.design-clay.dark .frosted-navbar,
+.design-clay .dark .frosted-navbar {
+  background-color: color-mix(in srgb, var(--surface) 88%, transparent) !important;
+  box-shadow: 
+    0 8px 24px -5px rgba(0, 0, 0, 0.25),
+    inset 2px 2px 4px rgba(255, 255, 255, 0.08),
+    inset -2px -2px 4px rgba(0, 0, 0, 0.25) !important;
+}
+
+/* White data chips for safe words explore */
+.clay-chip-white {
+  background-color: #ffffff !important;
+  color: var(--on-surface) !important;
+  border: 1px solid var(--outline-variant) !important;
+  border-radius: 14px !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02) !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.dark .clay-chip-white {
+  background-color: var(--surface-container-low) !important;
+  border-color: var(--outline-variant) !important;
+}
+.clay-chip-white:hover {
+  background-color: var(--surface-container-lowest) !important;
+  transform: translateY(-1px);
+}
+.clay-chip-white:active {
+  transform: translateY(0);
+}
+
+/* Claymorphic overrides for White data chips */
+.design-clay .clay-chip-white {
+  border-radius: 16px !important;
+  box-shadow: 
+    0 4px 10px rgba(0, 0, 0, 0.03),
+    inset 2px 2px 4px rgba(255, 255, 255, 1),
+    inset -2px -2px 4px rgba(0, 0, 0, 0.05) !important;
+  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+}
+.design-clay.dark .clay-chip-white,
+.design-clay .dark .clay-chip-white {
+  background-color: var(--surface-container-lowest) !important;
+  box-shadow: 
+    0 4px 10px rgba(0, 0, 0, 0.25),
+    inset 2px 2px 4px rgba(255, 255, 255, 0.05),
+    inset -2px -2px 4px rgba(0, 0, 0, 0.2) !important;
+  border: 1px solid var(--outline-variant) !important;
+}
+.design-clay .clay-chip-white:hover {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 
+    0 6px 12px rgba(0, 0, 0, 0.05),
+    inset 2px 2px 4px rgba(255, 255, 255, 1),
+    inset -2px -2px 4px rgba(0, 0, 0, 0.04) !important;
+}
+.design-clay .clay-chip-white:active {
+  transform: translateY(1px) scale(0.98);
+  box-shadow: 
+    0 2px 4px rgba(0, 0, 0, 0.03),
+    inset 1px 1px 2px rgba(255, 255, 255, 1),
+    inset -1px -1px 2px rgba(0, 0, 0, 0.08) !important;
+}
+

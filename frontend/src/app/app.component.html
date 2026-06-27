@@ -137,7 +137,7 @@
               <span class="material-symbols-rounded absolute left-6 top-1/2 -translate-y-1/2 text-outline text-[32px] pointer-events-none">
                 search
               </span>
-              <input class="w-full h-full min-h-[64px] pl-[64px] pr-16 font-headline-md text-headline-md text-on-surface dark:text-on-surface bg-background dark:bg-surface-container border-2 border-outline-variant dark:border-outline rounded-2xl focus:border-secondary focus:ring-4 focus:ring-secondary-container transition-all placeholder:text-outline outline-none" 
+              <input class="w-full h-full min-h-[64px] pl-[64px] pr-16 font-headline-md text-headline-md text-on-surface dark:text-on-surface clay-input placeholder:text-outline outline-none" 
                      placeholder="Type a word to analyze..." 
                      type="text"
                      [(ngModel)]="searchWord"
@@ -145,7 +145,7 @@
                      (keyup.enter)="searchWordBasic()"/>
             </div>
             <div class="flex gap-2 w-full md:w-auto">
-              <button class="flex-1 md:flex-none md:w-auto px-8 py-4 bg-primary text-on-primary font-headline-md text-headline-md rounded-2xl shadow-themed-primary hover:scale-[1.02] hover:bg-surface-tint active:scale-[0.98] transition-all flex items-center justify-center gap-2 group whitespace-nowrap min-h-[64px]"
+              <button class="flex-1 md:flex-none md:w-auto px-8 py-4 clay-primary font-headline-md text-headline-md transition-all flex items-center justify-center gap-2 group whitespace-nowrap min-h-[64px]"
                       (click)="searchWordBasic()"
                       [disabled]="isSearching">
                 <span *ngIf="!isSearching">Check Word</span>
@@ -169,7 +169,7 @@
         </div>
 
         <!-- Word Analysis Result Panel -->
-        <div *ngIf="searchResult && !isSearching" class="bg-surface-container-lowest dark:bg-surface-container border-2 border-primary-container dark:border-outline rounded-2xl p-6 shadow-sm flex flex-col gap-5">
+        <div *ngIf="searchResult && !isSearching" class="clay-card p-6 flex flex-col gap-5">
           <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-surface-variant dark:border-outline pb-4">
             <div class="flex items-center gap-3">
               <div class="w-12 h-12 rounded-full flex items-center justify-center text-white"
@@ -278,14 +278,14 @@
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4">
           <!-- Safe Words to Explore (Span 2) -->
           <div class="md:col-span-2">
-            <h4 class="font-label-md text-on-surface dark:text-on-surface mb-3 flex items-center gap-1.5">
-              <span class="material-symbols-rounded text-secondary">explore</span>
+            <h4 class="font-label-md text-on-surface dark:text-on-surface mb-3 flex items-center gap-1.5 leading-none">
+              <span class="material-symbols-rounded text-secondary text-lg leading-none">explore</span>
               Safe Words to Explore
             </h4>
             <div class="flex flex-wrap gap-2">
               <div *ngFor="let sugg of quickSuggestions" 
                    (click)="exploreWord(sugg.word)"
-                   class="px-3 py-1.5 bg-surface-container-lowest dark:bg-surface-container border border-surface-variant dark:border-outline rounded-xl flex items-center gap-1.5 hover:bg-surface-container-low dark:hover:bg-surface-container-high transition-colors cursor-pointer shadow-sm">
+                   class="px-3 py-1.5 clay-chip-white rounded-xl flex items-center gap-1.5 cursor-pointer">
                 <span class="material-symbols-rounded text-primary text-sm">{{ sugg.icon }}</span>
                 <span class="font-semibold text-xs text-on-surface dark:text-on-surface">{{ sugg.word | titlecase }}</span>
               </div>
@@ -293,7 +293,7 @@
           </div>
 
           <!-- Word Fact of the Day (Span 1) -->
-          <div class="md:col-span-1 bg-surface-container-low dark:bg-surface-container p-4 rounded-xl border border-surface-variant dark:border-outline flex flex-col justify-center gap-1">
+          <div class="md:col-span-1 clay-card p-4 flex flex-col justify-center gap-1">
             <div class="flex items-center gap-1.5 text-primary">
               <span class="material-symbols-rounded icon-filled text-base">lightbulb</span>
               <h4 class="font-bold text-xs uppercase tracking-wider text-on-surface dark:text-on-surface">Word Fact of the Day</h4>
@@ -304,7 +304,7 @@
           </div>
         </div>
 
-        <div class="bg-tertiary-container/20 dark:bg-tertiary-container/5 rounded-2xl p-6 shadow-sm border border-tertiary-container/30 relative overflow-hidden mt-6">
+        <div class="clay-card p-6 mt-6 relative overflow-hidden">
           <div class="relative z-10 flex flex-col md:flex-row gap-6 items-center">
             <div class="flex-1 w-full">
               <h3 class="font-headline-md text-headline-md text-primary dark:text-primary-fixed mb-2 flex items-center gap-2">
@@ -338,9 +338,9 @@
                        placeholder="Solve..." 
                        [(ngModel)]="puzzleGuess"
                        (keyup.enter)="checkPuzzleGuess()"
-                       class="px-4 py-2.5 bg-background dark:bg-background border border-outline rounded-xl text-sm outline-none focus:border-primary text-on-surface dark:text-on-surface flex-1 w-full"/>
+                       class="px-4 py-2.5 clay-input text-sm outline-none focus:border-primary text-on-surface dark:text-on-surface flex-1 w-full"/>
                 <button (click)="checkPuzzleGuess()" 
-                        class="px-5 py-2.5 bg-primary hover:bg-surface-tint text-on-primary font-bold rounded-xl shadow-sm transition-all text-sm">
+                        class="px-5 py-2.5 clay-primary font-bold transition-all text-sm">
                   Check
                 </button>
               </div>
@@ -364,7 +364,7 @@
           <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div *ngFor="let item of weeklyWords" 
                  (click)="exploreWord(item.word)"
-                 class="bg-surface dark:bg-surface-container border border-surface-variant dark:border-outline rounded-2xl p-4 hover:scale-[1.02] transition-transform cursor-pointer group flex flex-col gap-2">
+                 class="clay-card p-4 hover:scale-[1.02] transition-all cursor-pointer group flex flex-col gap-2">
               <div class="w-10 h-10 rounded-xl bg-primary-container text-on-primary-container flex items-center justify-center mb-1">
                 <span class="material-symbols-rounded">{{ item.icon }}</span>
               </div>
@@ -381,7 +381,7 @@
       <!-- ======================================================== -->
       <!-- VIEW 2: ADVANCED FILTER                                  -->
       <!-- ======================================================== -->
-      <div *ngIf="searchMode === 'advanced'" class="bg-surface-container-lowest  rounded-2xl p-6 shadow-sm border border-surface-variant dark:border-outline flex flex-col gap-6 animate-fade-in">
+      <div *ngIf="searchMode === 'advanced'" class="clay-card p-6 flex flex-col gap-6 animate-fade-in">
         <div>
           <h3 class="font-headline-md font-bold text-on-surface dark:text-on-surface mb-1">Advanced Word Query Filters</h3>
           <p class="text-body-md text-on-surface-variant dark:text-on-surface-variant">Filter the dictionary with multiple letter positions and lengths constraints in real time.</p>
@@ -391,37 +391,37 @@
         <form [formGroup]="filterForm" (change)="onFilterChange()" class="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label class="block font-label-sm text-label-sm text-on-surface dark:text-on-surface mb-1.5">Contains Letters</label>
-            <input formControlName="contains" type="text" placeholder="e.g. app" class="w-full p-3 bg-background dark:bg-on-surface-variant border border-outline-variant dark:border-outline rounded-xl text-body-md outline-none focus:border-primary"/>
+            <input formControlName="contains" type="text" placeholder="e.g. app" class="w-full p-3 clay-input text-body-md outline-none"/>
           </div>
           <div>
             <label class="block font-label-sm text-label-sm text-on-surface dark:text-on-surface mb-1.5">Starts With</label>
-            <input formControlName="starts_with" type="text" placeholder="e.g. a" class="w-full p-3 bg-background dark:bg-on-surface-variant border border-outline-variant dark:border-outline rounded-xl text-body-md outline-none focus:border-primary"/>
+            <input formControlName="starts_with" type="text" placeholder="e.g. a" class="w-full p-3 clay-input text-body-md outline-none"/>
           </div>
           <div>
             <label class="block font-label-sm text-label-sm text-on-surface dark:text-on-surface mb-1.5">Ends With</label>
-            <input formControlName="ends_with" type="text" placeholder="e.g. e" class="w-full p-3 bg-background dark:bg-on-surface-variant border border-outline-variant dark:border-outline rounded-xl text-body-md outline-none focus:border-primary"/>
+            <input formControlName="ends_with" type="text" placeholder="e.g. e" class="w-full p-3 clay-input text-body-md outline-none"/>
           </div>
           <div>
             <label class="block font-label-sm text-label-sm text-on-surface dark:text-on-surface mb-1.5">Exact Length</label>
-            <input formControlName="exact_length" type="number" min="1" placeholder="e.g. 5" class="w-full p-3 bg-background dark:bg-on-surface-variant border border-outline-variant dark:border-outline rounded-xl text-body-md outline-none focus:border-primary"/>
+            <input formControlName="exact_length" type="number" min="1" placeholder="e.g. 5" class="w-full p-3 clay-input text-body-md outline-none"/>
           </div>
           <div>
             <label class="block font-label-sm text-label-sm text-on-surface dark:text-on-surface mb-1.5">Min Length</label>
-            <input formControlName="min_length" type="number" min="1" placeholder="e.g. 3" class="w-full p-3 bg-background dark:bg-on-surface-variant border border-outline-variant dark:border-outline rounded-xl text-body-md outline-none focus:border-primary"/>
+            <input formControlName="min_length" type="number" min="1" placeholder="e.g. 3" class="w-full p-3 clay-input text-body-md outline-none"/>
           </div>
           <div>
             <label class="block font-label-sm text-label-sm text-on-surface dark:text-on-surface mb-1.5">Max Length</label>
-            <input formControlName="max_length" type="number" min="1" placeholder="e.g. 10" class="w-full p-3 bg-background dark:bg-on-surface-variant border border-outline-variant dark:border-outline rounded-xl text-body-md outline-none focus:border-primary"/>
+            <input formControlName="max_length" type="number" min="1" placeholder="e.g. 10" class="w-full p-3 clay-input text-body-md outline-none"/>
           </div>
           <div>
             <label class="block font-label-sm text-label-sm text-on-surface dark:text-on-surface mb-1.5">Max Results Limit</label>
-            <input formControlName="limit" type="number" min="10" max="1000" class="w-full p-3 bg-background dark:bg-on-surface-variant border border-outline-variant dark:border-outline rounded-xl text-body-md outline-none focus:border-primary"/>
+            <input formControlName="limit" type="number" min="10" max="1000" class="w-full p-3 clay-input text-body-md outline-none"/>
           </div>
           <div class="md:col-span-2 flex items-end justify-end gap-2">
-            <button type="button" (click)="clearFilters()" class="px-6 py-3 bg-surface-container hover:bg-surface-container-high text-on-surface rounded-xl font-label-md text-label-md border border-surface-variant transition-colors">
+            <button type="button" (click)="clearFilters()" class="px-6 py-3 clay-btn font-label-md text-label-md transition-colors">
               Reset Filters
             </button>
-            <button type="button" (click)="searchWords()" class="px-6 py-3 bg-primary text-on-primary hover:bg-surface-tint rounded-xl font-label-md text-label-md transition-colors">
+            <button type="button" (click)="searchWords()" class="px-6 py-3 clay-primary font-label-md text-label-md transition-colors">
               Apply Query
             </button>
           </div>
@@ -448,7 +448,7 @@
           <div class="flex flex-wrap gap-2 max-h-[300px] overflow-y-auto p-2 border border-surface-variant dark:border-outline rounded-xl bg-background dark:bg-on-surface-variant/30">
             <span *ngFor="let word of words" 
                   (click)="copyWordToClipboard(word)"
-                  class="px-3 py-1.5 bg-surface-container-lowest  border border-surface-variant dark:border-outline rounded-lg text-body-md text-on-surface dark:text-on-surface cursor-pointer hover:bg-surface-container dark:hover:bg-on-secondary-fixed transition-all hover:scale-[1.03] shadow-sm">
+                  class="px-3 py-1.5 clay-btn rounded-lg text-body-md cursor-pointer">
               {{ word }}
             </span>
             <p *ngIf="words.length === 0" class="w-full text-center text-outline p-8">No dictionary words match your filters.</p>
@@ -459,7 +459,7 @@
       <!-- ======================================================== -->
       <!-- VIEW 3: PUZZLE SOLVER (Regex & Wildcard)                 -->
       <!-- ======================================================== -->
-      <div *ngIf="searchMode === 'puzzle'" class="bg-surface-container-lowest  rounded-2xl p-6 shadow-sm border border-surface-variant dark:border-outline flex flex-col gap-6 animate-fade-in">
+      <div *ngIf="searchMode === 'puzzle'" class="clay-card p-6 flex flex-col gap-6 animate-fade-in">
         <div>
           <h3 class="font-headline-md font-bold text-on-surface dark:text-on-surface mb-1 flex items-center gap-2">
             <span class="material-symbols-rounded icon-filled text-primary">extension</span>
@@ -477,7 +477,7 @@
               <label class="block font-label-md text-on-surface dark:text-on-surface">Position-Specific Pattern Grid</label>
               <div class="flex items-center gap-2">
                 <span class="text-sm text-outline">Word Length:</span>
-                <input type="number" min="2" max="15" [(ngModel)]="puzzleLength" (change)="onPuzzleLengthChange()" class="w-16 p-1.5 bg-background dark:bg-on-surface-variant border border-outline rounded-lg text-center font-bold text-on-surface dark:text-on-surface outline-none"/>
+                <input type="number" min="2" max="15" [(ngModel)]="puzzleLength" (change)="onPuzzleLengthChange()" class="w-16 p-1.5 clay-input text-center font-bold text-on-surface dark:text-on-surface outline-none"/>
               </div>
             </div>
 
@@ -488,7 +488,7 @@
                      [value]="letter | uppercase"
                      (input)="updateLetter(i, $event)"
                      placeholder="?"
-                     class="w-12 h-12 text-center font-headline-lg bg-background dark:bg-on-surface-variant text-primary border-2 border-outline-variant rounded-xl focus:border-secondary outline-none shadow-sm transition-all"/>
+                     class="w-12 h-12 text-center font-headline-lg clay-input text-primary outline-none transition-all"/>
             </div>
             
             <div class="text-center mt-1 text-sm text-outline flex justify-center items-center gap-2">
@@ -500,14 +500,14 @@
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-surface-variant dark:border-outline pt-4">
             <div>
               <label class="block font-label-sm text-label-sm text-on-surface dark:text-on-surface mb-1.5">Regular Expression Pattern (Regex)</label>
-              <input type="text" [(ngModel)]="puzzleRegex" placeholder="e.g. ^h.p[ae]y$" class="w-full p-3 bg-background dark:bg-on-surface-variant border border-outline-variant dark:border-outline rounded-xl text-body-md outline-none focus:border-primary"/>
+              <input type="text" [(ngModel)]="puzzleRegex" placeholder="e.g. ^h.p[ae]y$" class="w-full p-3 clay-input text-body-md outline-none"/>
               <span class="text-xs text-outline mt-1 block">Full Python regular expressions supported.</span>
             </div>
             <div>
               <label class="block font-label-sm text-label-sm text-on-surface dark:text-on-surface mb-1.5 font-bold">Anagram Scrabble letters</label>
               <div class="flex gap-2">
                 <input type="text" [(ngModel)]="puzzleAnagram" placeholder="e.g. yaphp" class="w-full p-3 bg-background dark:bg-on-surface-variant border border-outline-variant dark:border-outline rounded-xl text-body-md outline-none focus:border-primary flex-1"/>
-                <label class="flex items-center gap-1.5 cursor-pointer select-none border border-surface-variant px-3 rounded-xl bg-surface-container">
+                <label class="flex items-center gap-1.5 cursor-pointer select-none border border-surface-variant px-3 rounded-xl clay-btn">
                   <input type="checkbox" [(ngModel)]="puzzleAnagramExact" class="rounded text-primary"/>
                   <span class="text-xs font-bold text-on-surface-variant">Exact</span>
                 </label>
@@ -518,13 +518,13 @@
 
           <!-- Puzzle Buttons -->
           <div class="flex flex-wrap gap-2 justify-end mt-2">
-            <button (click)="clearInteractive()" class="px-6 py-3 bg-surface-container hover:bg-surface-container-high text-on-surface rounded-xl font-label-md text-label-md border border-surface-variant transition-colors">
+            <button (click)="clearInteractive()" class="px-6 py-3 clay-btn font-label-md text-label-md transition-colors">
               Reset Puzzle
             </button>
-            <button (click)="randomizePattern()" class="px-6 py-3 bg-tertiary-fixed text-on-tertiary-fixed hover:bg-tertiary-fixed-dim rounded-xl font-label-md text-label-md transition-colors">
+            <button (click)="randomizePattern()" class="px-6 py-3 clay-btn bg-tertiary-fixed text-on-tertiary-fixed hover:bg-tertiary-fixed-dim rounded-xl font-label-md text-label-md transition-colors">
               Randomize Grid
             </button>
-            <button (click)="findMatchingWords()" class="px-8 py-3 bg-primary text-on-primary hover:bg-surface-tint rounded-xl font-headline-md text-headline-md shadow-sm transition-all" [disabled]="interactiveLoading">
+            <button (click)="findMatchingWords()" class="px-8 py-3 clay-primary font-headline-md text-headline-md transition-all" [disabled]="interactiveLoading">
               <span *ngIf="!interactiveLoading">Find Matches</span>
               <span *ngIf="interactiveLoading" class="animate-spin inline-block material-symbols-rounded">sync</span>
             </button>
@@ -546,7 +546,7 @@
           <div class="flex flex-wrap gap-2 max-h-[300px] overflow-y-auto p-2 bg-background dark:bg-on-surface-variant/30 border border-outline-variant dark:border-outline rounded-xl">
             <span *ngFor="let word of interactiveWords" 
                   (click)="copyWordToClipboard(word)"
-                  class="px-3.5 py-2 bg-surface-container-lowest  border border-surface-variant dark:border-outline rounded-lg text-body-md text-on-surface dark:text-on-surface cursor-pointer hover:bg-surface-container dark:hover:bg-on-secondary-fixed transition-all hover:scale-[1.03] shadow-sm">
+                  class="px-3.5 py-2 clay-btn rounded-lg text-body-md cursor-pointer">
               {{ word }}
             </span>
           </div>
@@ -556,7 +556,7 @@
       <!-- ======================================================== -->
       <!-- VIEW 4: GAMES ZONE (Wordle & Anagrams)                   -->
       <!-- ======================================================== -->
-      <div *ngIf="searchMode === 'games'" class="bg-surface-container-lowest  rounded-2xl p-6 shadow-sm border border-surface-variant dark:border-outline flex flex-col gap-6 animate-fade-in">
+      <div *ngIf="searchMode === 'games'" class="clay-card p-6 flex flex-col gap-6 animate-fade-in">
         
         <!-- Game Tab Header selector -->
         <div class="flex justify-between items-center border-b border-surface-variant dark:border-outline pb-4">
@@ -568,11 +568,11 @@
             <p class="text-sm text-on-surface-variant dark:text-on-surface-variant">Test your vocabulary with Wordle or Anagram Builder!</p>
           </div>
           <div class="flex gap-2">
-            <button class="px-4 py-2 rounded-xl text-sm font-bold transition-all border shadow-sm"
-                    [ngClass]="wordleActive ? 'bg-primary text-on-primary border-primary' : 'bg-surface-container text-on-surface-variant border-surface-variant'"
+            <button class="px-4 py-2 text-sm font-bold transition-all"
+                    [ngClass]="wordleActive ? 'clay-primary' : 'clay-btn'"
                     (click)="selectGameMode('wordle')">Wordle</button>
-            <button class="px-4 py-2 rounded-xl text-sm font-bold transition-all border shadow-sm"
-                    [ngClass]="anagramActive ? 'bg-primary text-on-primary border-primary' : 'bg-surface-container text-on-surface-variant border-surface-variant'"
+            <button class="px-4 py-2 text-sm font-bold transition-all"
+                    [ngClass]="anagramActive ? 'clay-primary' : 'clay-btn'"
                     (click)="selectGameMode('anagram')">Anagrams</button>
           </div>
         </div>
@@ -598,10 +598,10 @@
               <div *ngFor="let cell of row" 
                    class="w-12 h-12 flex items-center justify-center font-headline-lg border-2 rounded-xl font-bold select-none transition-all duration-300"
                    [ngClass]="{
-                     'bg-background border-outline-variant': cell.status === 'empty',
-                     'bg-primary text-white border-primary': cell.status === 'correct',
-                     'bg-tertiary-container text-on-tertiary-container border-tertiary-container': cell.status === 'present',
-                     'bg-on-surface-variant text-outline-variant border-on-surface-variant': cell.status === 'absent'
+                     'clay-input border-outline-variant': cell.status === 'empty',
+                     'clay-primary text-white': cell.status === 'correct',
+                     'bg-tertiary text-white shadow-md': cell.status === 'present',
+                     'bg-on-surface-variant text-white shadow-sm': cell.status === 'absent'
                    }">
                 {{ cell.letter }}
               </div>
@@ -626,10 +626,10 @@
               <button *ngFor="let key of ['Q','W','E','R','T','Y','U','I','O','P']" 
                       class="flex-1 min-h-[42px] rounded-lg font-bold text-sm transition-all text-center flex items-center justify-center"
                       [ngClass]="{
-                        'bg-surface-container text-on-surface': !wordleKeyboard[key],
-                        'bg-primary text-white': wordleKeyboard[key] === 'correct',
-                        'bg-tertiary-container text-on-tertiary-container': wordleKeyboard[key] === 'present',
-                        'bg-on-surface-variant text-outline-variant': wordleKeyboard[key] === 'absent'
+                        'clay-btn text-on-surface': !wordleKeyboard[key],
+                        'clay-primary text-white': wordleKeyboard[key] === 'correct',
+                        'bg-tertiary text-white shadow-md': wordleKeyboard[key] === 'present',
+                        'bg-on-surface-variant text-white shadow-sm': wordleKeyboard[key] === 'absent'
                       }"
                       (click)="onWordleKeyInput(key)">{{ key }}</button>
             </div>
@@ -638,10 +638,10 @@
               <button *ngFor="let key of ['A','S','D','F','G','H','J','K','L']" 
                       class="flex-1 min-h-[42px] rounded-lg font-bold text-sm transition-all text-center flex items-center justify-center"
                       [ngClass]="{
-                        'bg-surface-container text-on-surface': !wordleKeyboard[key],
-                        'bg-primary text-white': wordleKeyboard[key] === 'correct',
-                        'bg-tertiary-container text-on-tertiary-container': wordleKeyboard[key] === 'present',
-                        'bg-on-surface-variant text-outline-variant': wordleKeyboard[key] === 'absent'
+                        'clay-btn text-on-surface': !wordleKeyboard[key],
+                        'clay-primary text-white': wordleKeyboard[key] === 'correct',
+                        'bg-tertiary text-white shadow-md': wordleKeyboard[key] === 'present',
+                        'bg-on-surface-variant text-white shadow-sm': wordleKeyboard[key] === 'absent'
                       }"
                       (click)="onWordleKeyInput(key)">{{ key }}</button>
             </div>
@@ -651,10 +651,10 @@
               <button *ngFor="let key of ['Z','X','C','V','B','N','M']" 
                       class="flex-1 min-h-[42px] rounded-lg font-bold text-sm transition-all text-center flex items-center justify-center"
                       [ngClass]="{
-                        'bg-surface-container text-on-surface': !wordleKeyboard[key],
-                        'bg-primary text-white': wordleKeyboard[key] === 'correct',
-                        'bg-tertiary-container text-on-tertiary-container': wordleKeyboard[key] === 'present',
-                        'bg-on-surface-variant text-outline-variant': wordleKeyboard[key] === 'absent'
+                        'clay-btn text-on-surface': !wordleKeyboard[key],
+                        'clay-primary text-white': wordleKeyboard[key] === 'correct',
+                        'bg-tertiary text-white shadow-md': wordleKeyboard[key] === 'present',
+                        'bg-on-surface-variant text-white shadow-sm': wordleKeyboard[key] === 'absent'
                       }"
                       (click)="onWordleKeyInput(key)">{{ key }}</button>
               <button class="px-2 min-h-[42px] bg-surface-container hover:bg-surface-container-high rounded-lg font-bold text-xs" (click)="onWordleKeyInput('BACKSPACE')">DEL</button>
@@ -733,7 +733,7 @@
       <!-- ======================================================== -->
       <!-- VIEW 5: DICTIONARY ADMIN PANEL                           -->
       <!-- ======================================================== -->
-      <div *ngIf="searchMode === 'admin'" class="bg-surface-container-lowest  rounded-2xl p-6 shadow-sm border border-surface-variant dark:border-outline flex flex-col gap-6 animate-fade-in">
+      <div *ngIf="searchMode === 'admin'" class="clay-card p-6 flex flex-col gap-6 animate-fade-in">
         <div>
           <h3 class="font-headline-md font-bold text-on-surface dark:text-on-surface mb-1 flex items-center gap-2">
             <span class="material-symbols-rounded text-primary icon-filled">settings</span>
@@ -780,7 +780,7 @@
                 <span class="material-symbols-rounded text-primary">add_circle</span> Add Single Word
               </h4>
               <div class="flex gap-2">
-                <input type="text" [(ngModel)]="newWordText" placeholder="e.g. empathy" class="p-3 bg-background dark:bg-on-surface-variant border border-outline rounded-xl text-body-md outline-none focus:border-primary flex-1"/>
+                <input type="text" [(ngModel)]="newWordText" placeholder="e.g. empathy" class="p-3 clay-input text-body-md outline-none flex-1"/>
                 <button (click)="addNewWord()" class="px-5 py-3 bg-primary hover:bg-surface-tint text-on-primary font-bold rounded-xl shadow-sm transition-colors">
                   Add
                 </button>
@@ -797,8 +797,8 @@
                 <span class="material-symbols-rounded text-error">remove_circle</span> Remove Single Word
               </h4>
               <div class="flex gap-2">
-                <input type="text" [(ngModel)]="wordToRemoveText" placeholder="e.g. hate" class="p-3 bg-background dark:bg-on-surface-variant border border-outline rounded-xl text-body-md outline-none focus:border-primary flex-1"/>
-                <button (click)="deleteWord()" class="px-5 py-3 bg-error hover:bg-red-700 text-white font-bold rounded-xl shadow-sm transition-colors">
+                <input type="text" [(ngModel)]="wordToRemoveText" placeholder="e.g. hate" class="p-3 clay-input text-body-md outline-none flex-1"/>
+                <button (click)="deleteWord()" class="px-5 py-3 bg-error hover:bg-red-700 text-white font-bold rounded-xl shadow-[0_4px_12px_rgba(239,68,68,0.2)] transition-colors">
                   Delete
                 </button>
               </div>
@@ -811,9 +811,9 @@
               <span class="material-symbols-rounded text-primary">upload_file</span> Bulk Import Word List
             </h4>
             <p class="text-xs text-outline">Paste comma-separated or newline-separated words to import them in bulk.</p>
-            <textarea [(ngModel)]="bulkWordsText" rows="4" placeholder="e.g. apple, banana, cherry, date" class="w-full p-3 bg-background dark:bg-on-surface-variant border border-outline rounded-xl text-body-md outline-none focus:border-primary resize-y font-mono"></textarea>
+            <textarea [(ngModel)]="bulkWordsText" rows="4" placeholder="e.g. apple, banana, cherry, date" class="w-full p-3 clay-input text-body-md outline-none resize-y font-mono"></textarea>
             <div class="flex justify-end">
-              <button (click)="uploadBulkWords()" class="px-6 py-3 bg-primary hover:bg-surface-tint text-on-primary font-bold rounded-xl shadow-sm transition-colors">
+              <button (click)="uploadBulkWords()" class="px-6 py-3 clay-primary font-bold transition-colors">
                 Import Batch List
               </button>
             </div>
@@ -866,7 +866,7 @@
       <!-- ======================================================== -->
       <!-- VIEW 6: TELEMETRY & METRICS DASHBOARD                    -->
       <!-- ======================================================== -->
-      <div *ngIf="searchMode === 'performance'" class="bg-surface-container-lowest  rounded-2xl p-6 shadow-sm border border-surface-variant dark:border-outline flex flex-col gap-6 animate-fade-in">
+      <div *ngIf="searchMode === 'performance'" class="clay-card p-6 flex flex-col gap-6 animate-fade-in">
         <div>
           <h3 class="font-headline-md font-bold text-on-surface dark:text-on-surface mb-1 flex items-center gap-2">
             <span class="material-symbols-rounded text-primary icon-filled">monitoring</span>
@@ -899,7 +899,7 @@
           <div class="flex flex-col gap-6">
             
             <!-- Oxford Cache Card -->
-            <div *ngIf="oxfordStats" class="bg-surface-container-low p-5 rounded-2xl border border-surface-variant dark:border-outline shadow-sm flex flex-col gap-4 animate-fade-in">
+            <div *ngIf="oxfordStats" class="bg-background dark:bg-surface/30 p-5 rounded-2xl border border-surface-variant dark:border-outline shadow-[inset_1px_1px_3px_rgba(0,0,0,0.06)] flex flex-col gap-4 animate-fade-in">
               <h4 class="font-headline-sm font-bold text-primary dark:text-primary-fixed flex items-center gap-2 border-b border-surface-variant dark:border-outline pb-3">
                 <span class="material-symbols-rounded icon-filled">cached</span>
                 Dictionary Cache
@@ -917,7 +917,7 @@
             </div>
 
             <!-- System Status Card -->
-            <div class="bg-surface-container-low p-5 rounded-2xl border border-surface-variant dark:border-outline shadow-sm flex flex-col gap-4 animate-fade-in">
+            <div class="bg-background dark:bg-surface/30 p-5 rounded-2xl border border-surface-variant dark:border-outline shadow-[inset_1px_1px_3px_rgba(0,0,0,0.06)] flex flex-col gap-4 animate-fade-in">
               <h4 class="font-headline-sm font-bold text-primary dark:text-primary-fixed flex items-center gap-2 border-b border-surface-variant dark:border-outline pb-3">
                 <span class="material-symbols-rounded icon-filled">bar_chart</span>
                 System Status
@@ -939,7 +939,7 @@
             </div>
 
             <!-- Memory Usage Card -->
-            <div class="bg-surface-container-low p-5 rounded-2xl border border-surface-variant dark:border-outline shadow-sm flex flex-col gap-4 animate-fade-in">
+            <div class="bg-background dark:bg-surface/30 p-5 rounded-2xl border border-surface-variant dark:border-outline shadow-[inset_1px_1px_3px_rgba(0,0,0,0.06)] flex flex-col gap-4 animate-fade-in">
               <h4 class="font-headline-sm font-bold text-primary dark:text-primary-fixed flex items-center gap-2 border-b border-surface-variant dark:border-outline pb-3">
                 <span class="material-symbols-rounded icon-filled">save</span>
                 Memory Usage
@@ -962,7 +962,7 @@
           <div class="flex flex-col gap-6">
             
             <!-- Optimizations Card -->
-            <div class="bg-surface-container-low p-5 rounded-2xl border border-surface-variant dark:border-outline shadow-sm flex flex-col gap-4 h-full animate-fade-in">
+            <div class="bg-background dark:bg-surface/30 p-5 rounded-2xl border border-surface-variant dark:border-outline shadow-[inset_1px_1px_3px_rgba(0,0,0,0.06)] flex flex-col gap-4 h-full animate-fade-in">
               <h4 class="font-headline-sm font-bold text-primary dark:text-primary-fixed flex items-center gap-2 border-b border-surface-variant dark:border-outline pb-3">
                 <span class="material-symbols-rounded icon-filled">rocket_launch</span>
                 Optimizations
@@ -1019,7 +1019,7 @@
       <!-- ======================================================== -->
       <!-- VIEW 7: USER PROFILE & SETTINGS                          -->
       <!-- ======================================================== -->
-      <div *ngIf="searchMode === 'profile'" class="bg-surface-container-lowest  rounded-2xl p-6 shadow-sm border border-surface-variant dark:border-outline flex flex-col gap-6 animate-fade-in">
+      <div *ngIf="searchMode === 'profile'" class="clay-card p-6 flex flex-col gap-6 animate-fade-in">
         <div>
           <h3 class="font-headline-md font-bold text-on-surface dark:text-on-surface mb-1 flex items-center gap-2">
             <span class="material-symbols-rounded text-primary icon-filled">person</span>
@@ -1031,7 +1031,7 @@
         </div>
 
         <!-- Profile Details card -->
-        <div class="bg-surface-container-low p-6 rounded-xl border border-surface-variant dark:border-outline flex flex-col md:flex-row gap-6 items-center">
+        <div class="bg-background dark:bg-surface/30 p-6 rounded-2xl border border-surface-variant dark:border-outline shadow-[inset_1px_1px_3px_rgba(0,0,0,0.06)] flex flex-col md:flex-row gap-6 items-center">
           <div class="w-20 h-20 rounded-full bg-primary/10 border-2 border-primary/20 flex items-center justify-center text-primary">
             <span class="material-symbols-rounded text-5xl icon-filled">account_circle</span>
           </div>
@@ -1039,8 +1039,8 @@
             <div>
               <label class="block font-label-sm text-label-sm text-outline uppercase mb-1">Display Name</label>
               <div class="flex gap-2">
-                <input type="text" #nameInput [value]="profileName" placeholder="Enter name" class="px-4 py-2.5 bg-background dark:bg-on-surface-variant border border-outline rounded-xl font-bold text-on-surface dark:text-on-surface outline-none focus:border-primary flex-1"/>
-                <button (click)="saveProfileName(nameInput.value)" class="px-5 py-2.5 bg-primary hover:bg-surface-tint text-on-primary font-bold rounded-xl transition-all shadow-sm">
+                <input type="text" #nameInput [value]="profileName" placeholder="Enter name" class="px-4 py-2.5 clay-input font-bold text-on-surface dark:text-on-surface outline-none flex-1"/>
+                <button (click)="saveProfileName(nameInput.value)" class="px-5 py-2.5 clay-primary font-bold transition-all">
                   Save
                 </button>
               </div>
@@ -1048,117 +1048,146 @@
           </div>
         </div>
 
-        <!-- Custom Theme Switcher grid -->
-        <div class="border-t border-surface-variant dark:border-outline pt-6">
-          <h4 class="font-label-md text-on-surface dark:text-on-surface font-bold flex items-center gap-1.5 mb-4">
-            <span class="material-symbols-rounded text-primary font-bold">palette</span> Choose Accent Theme
+        <!-- Unified Customization & Theme Settings -->
+        <div class="border-t border-surface-variant dark:border-outline pt-6 flex flex-col gap-6">
+          <h4 class="font-label-md text-on-surface dark:text-on-surface font-bold flex items-center gap-1.5 border-b border-surface-variant dark:border-outline pb-2">
+            <span class="material-symbols-rounded text-primary font-bold">tune</span> Customization Panel
           </h4>
-          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <!-- Theme: Blue (Default) -->
-            <button (click)="changeTheme('blue')" 
-                    class="p-3 rounded-xl border-2 flex flex-col items-center gap-1.5 transition-all hover:scale-[1.02] bg-surface dark:bg-surface-container"
-                    [ngClass]="activeTheme === 'blue' ? 'border-primary bg-primary/5' : 'border-surface-variant dark:border-outline'">
-              <span class="w-6 h-6 rounded-full bg-[#0284c7] border border-white dark:border-outline-variant shadow-sm"></span>
-              <span class="text-xs font-bold text-on-surface dark:text-on-surface">Ocean Blue</span>
-            </button>
 
-            <!-- Theme: Green -->
-            <button (click)="changeTheme('green')" 
-                    class="p-3 rounded-xl border-2 flex flex-col items-center gap-1.5 transition-all hover:scale-[1.02] bg-surface dark:bg-surface-container"
-                    [ngClass]="activeTheme === 'green' ? 'border-primary bg-primary/5' : 'border-surface-variant dark:border-outline'">
-              <span class="w-6 h-6 rounded-full bg-[#15803d] border border-white dark:border-outline-variant shadow-sm"></span>
-              <span class="text-xs font-bold text-on-surface dark:text-on-surface">Emerald Green</span>
-            </button>
-
-            <!-- Theme: Indigo -->
-            <button (click)="changeTheme('indigo')" 
-                    class="p-3 rounded-xl border-2 flex flex-col items-center gap-1.5 transition-all hover:scale-[1.02] bg-surface dark:bg-surface-container"
-                    [ngClass]="activeTheme === 'indigo' ? 'border-primary bg-primary/5' : 'border-surface-variant dark:border-outline'">
-              <span class="w-6 h-6 rounded-full bg-[#4f46e5] border border-white dark:border-outline-variant shadow-sm"></span>
-              <span class="text-xs font-bold text-on-surface dark:text-on-surface">Royal Indigo</span>
-            </button>
-
-            <!-- Theme: Amber -->
-            <button (click)="changeTheme('amber')" 
-                    class="p-3 rounded-xl border-2 flex flex-col items-center gap-1.5 transition-all hover:scale-[1.02] bg-surface dark:bg-surface-container"
-                    [ngClass]="activeTheme === 'amber' ? 'border-primary bg-primary/5' : 'border-surface-variant dark:border-outline'">
-              <span class="w-6 h-6 rounded-full bg-[#d97706] border border-white dark:border-outline-variant shadow-sm"></span>
-              <span class="text-xs font-bold text-on-surface dark:text-on-surface">Sunset Amber</span>
-            </button>
-
-            <!-- Theme: Rose -->
-            <button (click)="changeTheme('rose')" 
-                    class="p-3 rounded-xl border-2 flex flex-col items-center gap-1.5 transition-all hover:scale-[1.02] bg-surface dark:bg-surface-container"
-                    [ngClass]="activeTheme === 'rose' ? 'border-primary bg-primary/5' : 'border-surface-variant dark:border-outline'">
-              <span class="w-6 h-6 rounded-full bg-[#db2777] border border-white dark:border-outline-variant shadow-sm"></span>
-              <span class="text-xs font-bold text-on-surface dark:text-on-surface">Crimson Rose</span>
-            </button>
-
-            <!-- Theme: Violet -->
-            <button (click)="changeTheme('violet')" 
-                    class="p-3 rounded-xl border-2 flex flex-col items-center gap-1.5 transition-all hover:scale-[1.02] bg-surface dark:bg-surface-container"
-                    [ngClass]="activeTheme === 'violet' ? 'border-primary bg-primary/5' : 'border-surface-variant dark:border-outline'">
-              <span class="w-6 h-6 rounded-full bg-[#7c3aed] border border-white dark:border-outline-variant shadow-sm"></span>
-              <span class="text-xs font-bold text-on-surface dark:text-on-surface">Midnight Violet</span>
-            </button>
-
-            <!-- Theme: Slate -->
-            <button (click)="changeTheme('slate')" 
-                    class="p-3 rounded-xl border-2 flex flex-col items-center gap-1.5 transition-all hover:scale-[1.02] bg-surface dark:bg-surface-container"
-                    [ngClass]="activeTheme === 'slate' ? 'border-primary bg-primary/5' : 'border-surface-variant dark:border-outline'">
-              <span class="w-6 h-6 rounded-full bg-[#475569] border border-white dark:border-outline-variant shadow-sm"></span>
-              <span class="text-xs font-bold text-on-surface dark:text-on-surface">Tech Slate</span>
-            </button>
-
-            <!-- Theme: Teal -->
-            <button (click)="changeTheme('teal')" 
-                    class="p-3 rounded-xl border-2 flex flex-col items-center gap-1.5 transition-all hover:scale-[1.02] bg-surface dark:bg-surface-container"
-                    [ngClass]="activeTheme === 'teal' ? 'border-primary bg-primary/5' : 'border-surface-variant dark:border-outline'">
-              <span class="w-6 h-6 rounded-full bg-[#0d9488] border border-white dark:border-outline-variant shadow-sm"></span>
-              <span class="text-xs font-bold text-on-surface dark:text-on-surface">Teal Coast</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Typography selector -->
-        <div class="border-t border-surface-variant dark:border-outline pt-6">
-          <h4 class="font-label-md text-on-surface dark:text-on-surface font-bold flex items-center gap-1.5 mb-4">
-            <span class="material-symbols-rounded text-primary font-bold">format_size</span> Choose Display Font
-          </h4>
-          <div class="grid grid-cols-2 sm:grid-cols-2 gap-3">
-            <button *ngFor="let opt of fontOptions"
-                    (click)="changeFont(opt.id)"
-                    class="p-3 rounded-xl border-2 flex flex-col items-center gap-2 transition-all hover:scale-[1.02] bg-surface dark:bg-surface-container"
-                    [ngClass]="activeFont === opt.id ? 'border-primary bg-primary/5' : 'border-surface-variant dark:border-outline'">
-              <span class="text-xl font-bold brand-font" [ngClass]="opt.cssClass">Ag</span>
-              <span class="text-xs font-bold text-on-surface dark:text-on-surface text-center">{{ opt.name }}</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Appearance mode toggle -->
-        <div class="border-t border-surface-variant dark:border-outline pt-6">
-          <h4 class="font-label-md text-on-surface dark:text-on-surface font-bold flex items-center gap-1.5 mb-4">
-            <span class="material-symbols-rounded text-primary font-bold">visibility</span> Theme Appearance
-          </h4>
-          <div class="flex items-center justify-between p-4 bg-surface dark:bg-surface-container border border-surface-variant dark:border-outline rounded-xl">
-            <div class="flex items-center gap-3">
-              <span class="material-symbols-rounded text-2xl text-on-surface dark:text-on-surface">
-                {{ isDarkMode ? 'dark_mode' : 'light_mode' }}
-              </span>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            <!-- Left side: Colors & Fonts -->
+            <div class="flex flex-col gap-5">
+              <!-- Color theme selection -->
               <div>
-                <div class="text-sm font-bold text-on-surface dark:text-on-surface">Dark Theme Mode</div>
-                <div class="text-xs text-on-surface-variant dark:text-on-surface-variant">Switch between Light and Dark interface appearance</div>
+                <label class="block font-label-sm text-xs text-outline uppercase mb-2">Accent Theme</label>
+                <div class="grid grid-cols-4 gap-2">
+                  <!-- Theme: Blue -->
+                  <button (click)="changeTheme('blue')" 
+                          class="p-2.5 clay-btn flex flex-col items-center gap-1 transition-all rounded-xl"
+                          [ngClass]="activeTheme === 'blue' ? 'border-primary bg-primary/5' : 'border-surface-variant dark:border-outline'">
+                    <span class="w-5 h-5 rounded-full bg-[#0284c7] border border-white dark:border-outline-variant shadow-sm"></span>
+                    <span class="text-[10px] font-bold text-on-surface dark:text-on-surface">Blue</span>
+                  </button>
+
+                  <!-- Theme: Green -->
+                  <button (click)="changeTheme('green')" 
+                          class="p-2.5 clay-btn flex flex-col items-center gap-1 transition-all rounded-xl"
+                          [ngClass]="activeTheme === 'green' ? 'border-primary bg-primary/5' : 'border-surface-variant dark:border-outline'">
+                    <span class="w-5 h-5 rounded-full bg-[#15803d] border border-white dark:border-outline-variant shadow-sm"></span>
+                    <span class="text-[10px] font-bold text-on-surface dark:text-on-surface">Green</span>
+                  </button>
+
+                  <!-- Theme: Indigo -->
+                  <button (click)="changeTheme('indigo')" 
+                          class="p-2.5 clay-btn flex flex-col items-center gap-1 transition-all rounded-xl"
+                          [ngClass]="activeTheme === 'indigo' ? 'border-primary bg-primary/5' : 'border-surface-variant dark:border-outline'">
+                    <span class="w-5 h-5 rounded-full bg-[#4f46e5] border border-white dark:border-outline-variant shadow-sm"></span>
+                    <span class="text-[10px] font-bold text-on-surface dark:text-on-surface">Indigo</span>
+                  </button>
+
+                  <!-- Theme: Amber -->
+                  <button (click)="changeTheme('amber')" 
+                          class="p-2.5 clay-btn flex flex-col items-center gap-1 transition-all rounded-xl"
+                          [ngClass]="activeTheme === 'amber' ? 'border-primary bg-primary/5' : 'border-surface-variant dark:border-outline'">
+                    <span class="w-5 h-5 rounded-full bg-[#d97706] border border-white dark:border-outline-variant shadow-sm"></span>
+                    <span class="text-[10px] font-bold text-on-surface dark:text-on-surface">Amber</span>
+                  </button>
+
+                  <!-- Theme: Rose -->
+                  <button (click)="changeTheme('rose')" 
+                          class="p-2.5 clay-btn flex flex-col items-center gap-1 transition-all rounded-xl"
+                          [ngClass]="activeTheme === 'rose' ? 'border-primary bg-primary/5' : 'border-surface-variant dark:border-outline'">
+                    <span class="w-5 h-5 rounded-full bg-[#db2777] border border-white dark:border-outline-variant shadow-sm"></span>
+                    <span class="text-[10px] font-bold text-on-surface dark:text-on-surface">Rose</span>
+                  </button>
+
+                  <!-- Theme: Violet -->
+                  <button (click)="changeTheme('violet')" 
+                          class="p-2.5 clay-btn flex flex-col items-center gap-1 transition-all rounded-xl"
+                          [ngClass]="activeTheme === 'violet' ? 'border-primary bg-primary/5' : 'border-surface-variant dark:border-outline'">
+                    <span class="w-5 h-5 rounded-full bg-[#7c3aed] border border-white dark:border-outline-variant shadow-sm"></span>
+                    <span class="text-[10px] font-bold text-on-surface dark:text-on-surface">Violet</span>
+                  </button>
+
+                  <!-- Theme: Slate -->
+                  <button (click)="changeTheme('slate')" 
+                          class="p-2.5 clay-btn flex flex-col items-center gap-1 transition-all rounded-xl"
+                          [ngClass]="activeTheme === 'slate' ? 'border-primary bg-primary/5' : 'border-surface-variant dark:border-outline'">
+                    <span class="w-5 h-5 rounded-full bg-[#475569] border border-white dark:border-outline-variant shadow-sm"></span>
+                    <span class="text-[10px] font-bold text-on-surface dark:text-on-surface">Slate</span>
+                  </button>
+
+                  <!-- Theme: Teal -->
+                  <button (click)="changeTheme('teal')" 
+                          class="p-2.5 clay-btn flex flex-col items-center gap-1 transition-all rounded-xl"
+                          [ngClass]="activeTheme === 'teal' ? 'border-primary bg-primary/5' : 'border-surface-variant dark:border-outline'">
+                    <span class="w-5 h-5 rounded-full bg-[#0d9488] border border-white dark:border-outline-variant shadow-sm"></span>
+                    <span class="text-[10px] font-bold text-on-surface dark:text-on-surface">Teal</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Display Font Selection -->
+              <div>
+                <label class="block font-label-sm text-xs text-outline uppercase mb-2">Display Font</label>
+                <div class="grid grid-cols-2 gap-2">
+                  <button *ngFor="let opt of fontOptions"
+                          (click)="changeFont(opt.id)"
+                          class="py-2 px-3 clay-btn flex items-center justify-center gap-2 transition-all rounded-xl"
+                          [ngClass]="activeFont === opt.id ? 'border-primary bg-primary/5' : 'border-surface-variant dark:border-outline'">
+                    <span class="text-base font-bold brand-font" [ngClass]="opt.cssClass">Ag</span>
+                    <span class="text-xs font-bold text-on-surface dark:text-on-surface">{{ opt.name }}</span>
+                  </button>
+                </div>
               </div>
             </div>
-            <!-- Toggle switch button -->
-            <button (click)="toggleTheme()" 
-                    class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none bg-surface-container-high dark:bg-surface-container-highest"
-                    [ngClass]="isDarkMode ? 'bg-primary dark:bg-primary-fixed' : 'bg-outline-variant'">
-              <span class="sr-only">Toggle Dark Mode</span>
-              <span class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
-                    [ngClass]="isDarkMode ? 'translate-x-6' : 'translate-x-1'"></span>
-            </button>
+
+            <!-- Right side: Style Switches -->
+            <div class="flex flex-col gap-3 justify-center">
+              
+              <!-- Dark Mode Switch -->
+              <div class="flex items-center justify-between p-3.5 bg-background dark:bg-surface/30 border border-surface-variant dark:border-outline rounded-2xl shadow-[inset_1px_1px_3px_rgba(0,0,0,0.06)]">
+                <div class="flex items-center gap-3">
+                  <span class="material-symbols-rounded text-xl text-on-surface dark:text-on-surface">
+                    {{ isDarkMode ? 'dark_mode' : 'light_mode' }}
+                  </span>
+                  <div>
+                    <div class="text-xs font-bold text-on-surface dark:text-on-surface">Dark Theme Mode</div>
+                    <div class="text-[10px] text-on-surface-variant dark:text-on-surface-variant">Switch color appearance</div>
+                  </div>
+                </div>
+                <button (click)="toggleTheme()" 
+                        class="relative inline-flex h-5 w-10 items-center rounded-full transition-colors focus:outline-none bg-surface-container-high dark:bg-surface-container-highest"
+                        [ngClass]="isDarkMode ? 'bg-primary dark:bg-primary-fixed' : 'bg-outline-variant'">
+                  <span class="sr-only">Toggle Dark Mode</span>
+                  <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform"
+                        [ngClass]="isDarkMode ? 'translate-x-5' : 'translate-x-1'"></span>
+                </button>
+              </div>
+
+              <!-- Claymorphism Switch -->
+              <div class="flex items-center justify-between p-3.5 bg-background dark:bg-surface/30 border border-surface-variant dark:border-outline rounded-2xl shadow-[inset_1px_1px_3px_rgba(0,0,0,0.06)]">
+                <div class="flex items-center gap-3">
+                  <span class="material-symbols-rounded text-xl text-on-surface dark:text-on-surface">
+                    layers
+                  </span>
+                  <div>
+                    <div class="text-xs font-bold text-on-surface dark:text-on-surface">Claymorphism Mode</div>
+                    <div class="text-[10px] text-on-surface-variant dark:text-on-surface-variant">Toggle puffy 3D styling</div>
+                  </div>
+                </div>
+                <button (click)="toggleClaymorphic()" 
+                        class="relative inline-flex h-5 w-10 items-center rounded-full transition-colors focus:outline-none bg-surface-container-high dark:bg-surface-container-highest"
+                        [ngClass]="isClaymorphic ? 'bg-primary dark:bg-primary-fixed' : 'bg-outline-variant'">
+                  <span class="sr-only">Toggle Claymorphic Style</span>
+                  <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform"
+                        [ngClass]="isClaymorphic ? 'translate-x-5' : 'translate-x-1'"></span>
+                </button>
+              </div>
+
+            </div>
+
           </div>
         </div>
 
@@ -1186,30 +1215,8 @@
     <div class="lg:col-span-1 flex flex-col gap-6">
       
       <!-- Sidebar Info Piece -->
-      <div class="bg-surface-container-low dark:bg-surface-container rounded-2xl p-8 shadow-[0_4px_16px_0_rgba(74,124,89,0.08)] border border-surface-variant dark:border-outline h-full flex flex-col gap-8">
+      <div class="clay-card p-8 h-full flex flex-col gap-8">
         
-        <!-- Live statistics metrics panel -->
-        <div *ngIf="wordStats">
-          <div class="flex items-center gap-2 mb-3">
-            <span class="material-symbols-rounded text-primary icon-filled">analytics</span>
-            <h3 class="font-headline-md font-bold text-on-surface dark:text-on-surface">Statistics</h3>
-          </div>
-          <ul class="space-y-4 font-body-md text-on-surface-variant dark:text-on-surface-variant">
-            <li class="flex items-center justify-between border-b border-surface-variant/40 pb-2">
-              <span class="flex items-center gap-1.5"><span class="material-symbols-rounded text-sm">book</span> Dictionary Size:</span>
-              <strong class="text-primary font-bold">{{ wordStats.total_words | number }}</strong>
-            </li>
-            <li class="flex items-center justify-between border-b border-surface-variant/40 pb-2">
-              <span class="flex items-center gap-1.5"><span class="material-symbols-rounded text-sm">straighten</span> Length Range:</span>
-              <strong class="text-primary font-bold">{{ wordStats.min_length }} - {{ wordStats.max_length }} letters</strong>
-            </li>
-            <li class="flex items-center justify-between border-b border-surface-variant/40 pb-2">
-              <span class="flex items-center gap-1.5"><span class="material-symbols-rounded text-sm">bar_chart</span> Avg Word Length:</span>
-              <strong class="text-primary font-bold">{{ wordStats.avg_length }} letters</strong>
-            </li>
-          </ul>
-        </div>
-
         <!-- Quick Tips -->
         <div>
           <div class="flex items-center gap-2 mb-3">
@@ -1229,17 +1236,17 @@
         </div>
 
         <!-- Daily Safe Word -->
-        <div class="bg-surface dark:bg-surface-container-low p-6 rounded-2xl shadow-sm border border-surface-variant dark:border-outline">
-          <div class="flex items-center gap-2 mb-2 text-primary">
-            <span class="material-symbols-rounded icon-filled">today</span>
-            <h4 class="font-label-md text-label-md uppercase tracking-wider font-bold">Daily Safe Word</h4>
+        <div class="bg-background dark:bg-surface/30 p-6 rounded-2xl border border-surface-variant dark:border-outline shadow-[inset_1px_1px_3px_rgba(0,0,0,0.06)]">
+          <div class="flex items-center gap-2 mb-2 text-primary leading-none">
+            <span class="material-symbols-rounded icon-filled text-lg leading-none">today</span>
+            <h4 class="font-label-md text-label-md uppercase tracking-wider font-bold leading-none">Daily Safe Word</h4>
           </div>
           <div class="font-headline-lg text-headline-lg text-on-surface dark:text-on-surface mb-2">Empathy</div>
           <p class="font-body-md text-on-surface-variant dark:text-on-surface-variant">The ability to understand and share the feelings of another. Encourages compassionate behavior!</p>
         </div>
 
         <!-- Parental Safety Advice -->
-        <div class="bg-surface-container dark:bg-surface-container-high p-6 rounded-2xl border border-surface-variant dark:border-outline mt-auto">
+        <div class="bg-background dark:bg-surface/30 p-6 rounded-2xl border border-surface-variant dark:border-outline shadow-[inset_1px_1px_3px_rgba(0,0,0,0.06)] mt-auto">
           <div class="flex items-center gap-2 mb-3">
             <span class="material-symbols-rounded text-primary icon-filled">family_restroom</span>
             <h4 class="font-label-md text-label-md uppercase tracking-wider text-on-surface dark:text-on-surface font-bold">Parental Safety Advice</h4>

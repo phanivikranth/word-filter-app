@@ -1,0 +1,578 @@
+﻿<div class="app-container">
+  <!-- Fun Header -->
+  <header class="fun-header">
+    <div class="header-content">
+      <div class="logo-section">
+        <div class="logo-icon">≡ƒôÜ</div>
+        <div class="logo-text-group">
+          <h1 class="app-title">Word Explorer</h1>
+          <p class="app-subtitle">Discover amazing words together!</p>
+        </div>
+      </div>
+      
+      <div class="header-right">
+        <!-- Inline Stats Display -->
+        <div class="header-stats" *ngIf="wordStats">
+          <div class="stat-item">
+            <span class="stat-icon">≡ƒôÜ</span>
+            <span class="stat-text"><strong>{{ wordStats.total_words | number }}</strong> words</span>
+          </div>
+          <div class="stat-divider"></div>
+          <div class="stat-item">
+            <span class="stat-icon">≡ƒôÅ</span>
+            <span class="stat-text"><strong>{{ wordStats.min_length }}-{{ wordStats.max_length }}</strong> letters</span>
+          </div>
+          <div class="stat-divider"></div>
+          <div class="stat-item">
+            <span class="stat-icon">≡ƒôè</span>
+            <span class="stat-text"><strong>{{ wordStats.avg_length }}</strong> avg</span>
+          </div>
+        </div>
+        
+        <div class="header-actions">
+          <button class="fun-button theme-toggle" (click)="toggleTheme()" title="Toggle Theme">
+            <span class="button-icon">{{ isDarkMode ? 'ΓÿÇ∩╕Å' : '≡ƒîÖ' }}</span>
+          </button>
+          <button class="fun-button performance-button" (click)="togglePerformanceStats()" title="Performance Stats">
+            <span class="button-icon">ΓÜí</span>
+            <span class="button-text">Performance</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="main-content">
+    
+    <!-- Welcome Section (Modern Hero) -->
+    <section class="welcome-section hero-layout" *ngIf="!searchResult">
+      <div class="hero-bg-glow"></div>
+      <div class="hero-content">
+        <div class="welcome-illustration">
+          <div class="floating-emoji">≡ƒöì</div>
+          <div class="floating-emoji">≡ƒôû</div>
+          <div class="floating-emoji">Γ£¿</div>
+        </div>
+        <h2 class="welcome-title">Ready to explore words?</h2>
+        <p class="welcome-text">Type any word below and discover its meaning, pronunciation, and more!</p>
+      </div>
+    </section>
+
+    <!-- Search Section -->
+    <section class="search-section">
+      <div class="search-card">
+        <div class="search-header">
+          <h3 class="search-title">≡ƒöì Word Search</h3>
+          <p class="search-subtitle">What word would you like to explore today?</p>
+          
+          <!-- Mode Toggle -->
+          <div class="mode-toggle">
+            <button 
+              class="mode-button"
+              [class.active]="searchMode === 'basic'"
+              (click)="setSearchMode('basic')">
+              ≡ƒöì Basic
+            </button>
+            <button 
+              class="mode-button"
+              [class.active]="searchMode === 'advanced'"
+              (click)="setSearchMode('advanced')">
+              ΓÜÖ∩╕Å Advanced
+            </button>
+            <button 
+              class="mode-button"
+              [class.active]="searchMode === 'puzzle'"
+              (click)="setSearchMode('puzzle')">
+              ≡ƒº⌐ Puzzle
+            </button>
+            <button 
+              class="mode-button"
+              [class.active]="searchMode === 'browse'"
+              (click)="setSearchMode('browse')">
+              ≡ƒôÅ Browse
+            </button>
+          </div>
+        </div>
+        
+        <!-- Basic Search -->
+        <div class="search-input-container" *ngIf="searchMode === 'basic'">
+          <div class="search-input-wrapper">
+            <input 
+              type="text" 
+              class="search-input"
+              [(ngModel)]="searchWord"
+              (input)="onSearchInput()"
+              (keyup.enter)="searchWordBasic()"
+              placeholder="Type a word here..."
+              [disabled]="isSearching">
+            <button 
+              class="search-button"
+              (click)="searchWordBasic()"
+              [disabled]="!searchWord || searchWord.trim() === '' || isSearching">
+              <span *ngIf="!isSearching">≡ƒÜÇ</span>
+              <span *ngIf="isSearching" class="spinner">ΓÅ│</span>
+            </button>
+          </div>
+          
+          <!-- Quick Suggestions -->
+          <div class="quick-suggestions" *ngIf="!searchResult && !isSearching">
+            <p class="suggestions-label">Try these fun words:</p>
+            <div class="suggestion-chips">
+              <button 
+                class="suggestion-chip"
+                *ngFor="let suggestion of quickSuggestions"
+                (click)="searchWord = suggestion; searchWordBasic()">
+                {{ suggestion }}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Advanced Search -->
+        <div class="advanced-search-container" *ngIf="searchMode === 'advanced'">
+          <form [formGroup]="filterForm" (ngSubmit)="searchWords()">
+            <div class="filter-grid">
+              <div class="filter-group">
+                <label class="filter-label">Contains letters:</label>
+                <input 
+                  type="text" 
+                  formControlName="contains"
+                  class="filter-input"
+                  placeholder="e.g., app">
+              </div>
+              
+              <div class="filter-group">
+                <label class="filter-label">Starts with:</label>
+                <input 
+                  type="text" 
+                  formControlName="starts_with"
+                  class="filter-input"
+                  placeholder="e.g., un">
+              </div>
+              
+              <div class="filter-group">
+                <label class="filter-label">Ends with:</label>
+                <input 
+                  type="text" 
+                  formControlName="ends_with"
+                  class="filter-input"
+                  placeholder="e.g., ing">
+              </div>
+              
+              <div class="filter-group">
+                <label class="filter-label">Min length:</label>
+                <input 
+                  type="number" 
+                  formControlName="min_length"
+                  class="filter-input"
+                  placeholder="3"
+                  min="1">
+              </div>
+              
+              <div class="filter-group">
+                <label class="filter-label">Max length:</label>
+                <input 
+                  type="number" 
+                  formControlName="max_length"
+                  class="filter-input"
+                  placeholder="10"
+                  min="1">
+              </div>
+              
+              <div class="filter-group">
+                <label class="filter-label">Exact length:</label>
+                <input 
+                  type="number" 
+                  formControlName="exact_length"
+                  class="filter-input"
+                  placeholder="5"
+                  min="1">
+              </div>
+              
+              <div class="filter-group">
+                <label class="filter-label">Limit results:</label>
+                <input 
+                  type="number" 
+                  formControlName="limit"
+                  class="filter-input"
+                  placeholder="100"
+                  min="1"
+                  max="1000">
+              </div>
+            </div>
+            
+            <div class="filter-actions">
+              <button 
+                type="submit" 
+                class="search-button"
+                [disabled]="loading">
+                <span *ngIf="!loading">≡ƒöì</span>
+                <span *ngIf="loading" class="spinner">ΓÅ│</span>
+                Search Words
+              </button>
+              <button 
+                type="button" 
+                class="fun-button secondary"
+                (click)="clearFilters()">
+                ≡ƒùæ∩╕Å Clear
+              </button>
+            </div>
+          </form>
+          
+          <!-- Advanced Results -->
+          <div class="advanced-results" *ngIf="words.length > 0">
+            <h4 class="results-title">Found {{ words.length }} words:</h4>
+            <div class="word-list">
+              <button 
+                class="word-item"
+                *ngFor="let word of words"
+                (click)="searchWord = word; searchWordBasic()">
+                {{ word }}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Puzzle Solver -->
+        <div class="puzzle-search-container" *ngIf="searchMode === 'puzzle'">
+          <div class="puzzle-controls">
+            <div class="puzzle-group">
+              <label class="filter-label">Word Length:</label>
+              <input 
+                type="number" 
+                [(ngModel)]="puzzleLength"
+                (ngModelChange)="onPuzzleLengthChange()"
+                class="filter-input"
+                placeholder="5"
+                min="1"
+                max="20">
+            </div>
+            
+            <div class="puzzle-group">
+              <label class="filter-label">Pattern (use ? for unknown):</label>
+              <input 
+                type="text" 
+                [(ngModel)]="puzzlePattern"
+                (ngModelChange)="onPuzzlePatternChange()"
+                class="filter-input"
+                placeholder="a?ple"
+                maxlength="20">
+            </div>
+          </div>
+          
+          <div class="puzzle-actions">
+            <button 
+              class="search-button"
+              (click)="findMatchingWords()"
+              [disabled]="!puzzleLength || interactiveLoading">
+              <span *ngIf="!interactiveLoading">≡ƒº⌐</span>
+              <span *ngIf="interactiveLoading" class="spinner">ΓÅ│</span>
+              Solve Puzzle
+            </button>
+            <button 
+              class="fun-button secondary"
+              (click)="clearInteractive()">
+              ≡ƒùæ∩╕Å Clear
+            </button>
+          </div>
+          
+          <!-- Puzzle Results -->
+          <div class="puzzle-results" *ngIf="interactiveWords.length > 0">
+            <h4 class="results-title">Found {{ interactiveWords.length }} matches:</h4>
+            <div class="word-list">
+              <button 
+                class="word-item"
+                *ngFor="let word of interactiveWords"
+                (click)="searchWord = word; searchWordBasic()">
+                {{ word }}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Browse by Length -->
+        <div class="browse-search-container" *ngIf="searchMode === 'browse'">
+          <div class="browse-controls">
+            <div class="browse-group">
+              <label class="filter-label">Word Length:</label>
+              <input 
+                type="number" 
+                [(ngModel)]="browseLength"
+                (ngModelChange)="onBrowseLengthChange()"
+                class="filter-input"
+                placeholder="5"
+                min="1"
+                max="20">
+            </div>
+          </div>
+          
+          <div class="browse-actions">
+            <button 
+              class="search-button"
+              (click)="loadWordsByLength()"
+              [disabled]="!browseLength || browseLoading">
+              <span *ngIf="!browseLoading">≡ƒôÅ</span>
+              <span *ngIf="browseLoading" class="spinner">ΓÅ│</span>
+              Browse Words
+            </button>
+            <button 
+              class="fun-button secondary"
+              (click)="clearBrowse()">
+              ≡ƒùæ∩╕Å Clear
+            </button>
+          </div>
+          
+          <!-- Browse Results -->
+          <div class="browse-results" *ngIf="browseWords.length > 0">
+            <h4 class="results-title">Found {{ browseWords.length }} words of length {{ browseLength }}:</h4>
+            <div class="word-list">
+              <button 
+                class="word-item"
+                *ngFor="let word of browseWords"
+                (click)="searchWord = word; searchWordBasic()">
+                {{ word }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Loading State -->
+    <section class="loading-section" *ngIf="isSearching">
+      <div class="loading-card">
+        <div class="loading-animation">
+          <div class="loading-spinner"></div>
+          <h3 class="loading-title">Exploring "{{ searchWord }}"...</h3>
+          <p class="loading-text">Finding amazing details for you!</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Error State -->
+    <section class="error-section" *ngIf="searchError && !isSearching">
+      <div class="error-card">
+        <div class="error-icon">≡ƒÿà</div>
+        <h3 class="error-title">Oops! Something went wrong</h3>
+        <p class="error-text">{{ searchError }}</p>
+        <button class="fun-button retry-button" (click)="searchWordBasic()">
+          <span class="button-icon">≡ƒöä</span>
+          <span class="button-text">Try Again</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- Results Section -->
+    <section class="results-section" *ngIf="searchResult && !isSearching && !searchError">
+      
+      <!-- Word Header -->
+      <div class="word-header-card">
+        <div class="word-display">
+          <h1 class="word-title">{{ searchResult.word | titlecase }}</h1>
+          <div class="word-badges">
+            <span class="word-badge length-badge" *ngIf="searchResult.word">
+              {{ searchResult.word.length }} letters
+            </span>
+            <span class="word-badge collection-badge" *ngIf="searchResult.inCollection">
+              Γ£à In Collection
+            </span>
+            <span class="word-badge verified-badge" *ngIf="searchResult.oxford">
+              ≡ƒÅå Oxford Verified
+            </span>
+          </div>
+        </div>
+        
+        <div class="word-actions">
+          <button 
+            class="fun-button action-button"
+            *ngIf="!searchResult.inCollection"
+            (click)="addWordToCollection(searchResult.word)">
+            <span class="button-icon">Γ₧ò</span>
+            <span class="button-text">Add to Collection</span>
+          </button>
+          <button 
+            class="fun-button action-button success"
+            *ngIf="searchResult.inCollection"
+            disabled>
+            <span class="button-icon">Γ£à</span>
+            <span class="button-text">In Collection</span>
+          </button>
+          <button 
+            class="fun-button icon-button"
+            (click)="copyWordToClipboard(searchResult.word)"
+            title="Copy word">
+            <span class="button-icon">≡ƒôï</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Word Details Grid -->
+      <div class="word-details-grid">
+        
+        <!-- Definitions Card -->
+        <div class="detail-card definitions-card" *ngIf="searchResult.oxford && searchResult.oxford.definitions && searchResult.oxford.definitions.length > 0">
+          <div class="card-header">
+            <div class="card-icon">≡ƒôû</div>
+            <h3 class="card-title">Definitions</h3>
+            <span class="card-count">{{ searchResult.oxford.definitions.length }}</span>
+          </div>
+          <div class="card-content">
+            <div class="definition-list">
+              <div class="definition-item" *ngFor="let definition of searchResult.oxford.definitions; let i = index">
+                <span class="definition-number">{{ i + 1 }}</span>
+                <p class="definition-text">{{ definition }}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Pronunciation Card -->
+        <div class="detail-card pronunciation-card" *ngIf="searchResult.oxford && searchResult.oxford.pronunciations && searchResult.oxford.pronunciations.length > 0">
+          <div class="card-header">
+            <div class="card-icon">≡ƒöè</div>
+            <h3 class="card-title">Pronunciation</h3>
+          </div>
+          <div class="card-content">
+            <div class="pronunciation-list">
+              <div class="pronunciation-item" *ngFor="let pron of searchResult.oxford.pronunciations">
+                <span class="pronunciation-label">{{ pron.prefix || 'Standard' }}</span>
+                <span class="pronunciation-ipa">{{ pron.ipa }}</span>
+                <button 
+                  class="play-button"
+                  *ngIf="pron.url" 
+                  (click)="playPronunciation(pron.url)"
+                  title="Play">
+                  Γû╢∩╕Å
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Examples Card -->
+        <div class="detail-card examples-card" *ngIf="searchResult.oxford && searchResult.oxford.examples && searchResult.oxford.examples.length > 0">
+          <div class="card-header">
+            <div class="card-icon">≡ƒÆ¼</div>
+            <h3 class="card-title">Examples</h3>
+            <span class="card-count">{{ searchResult.oxford.examples.length }}</span>
+          </div>
+          <div class="card-content">
+            <div class="example-list">
+              <div class="example-item" *ngFor="let example of searchResult.oxford.examples">
+                <div class="example-quote">≡ƒÆ¡</div>
+                <p class="example-text">{{ example }}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Synonyms Card -->
+        <div class="detail-card synonyms-card" *ngIf="searchResult.oxford && searchResult.oxford.synonyms && searchResult.oxford.synonyms.length > 0">
+          <div class="card-header">
+            <div class="card-icon">≡ƒöä</div>
+            <h3 class="card-title">Similar Words</h3>
+            <span class="card-count">{{ searchResult.oxford.synonyms.length }}</span>
+          </div>
+          <div class="card-content">
+            <div class="synonym-chips">
+              <button 
+                class="synonym-chip"
+                *ngFor="let synonym of searchResult.oxford.synonyms"
+                (click)="exploreWord(synonym)">
+                {{ synonym }}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Word Forms Card -->
+        <div class="detail-card forms-card" *ngIf="searchResult.oxford && searchResult.oxford.word_forms && searchResult.oxford.word_forms.length > 0">
+          <div class="card-header">
+            <div class="card-icon">≡ƒöñ</div>
+            <h3 class="card-title">Word Forms</h3>
+            <span class="card-count">{{ searchResult.oxford.word_forms.length }}</span>
+          </div>
+          <div class="card-content">
+            <div class="form-chips">
+              <span class="form-chip" *ngFor="let form of searchResult.oxford.word_forms">
+                {{ form }}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Word Info Card -->
+        <div class="detail-card info-card">
+          <div class="card-header">
+            <div class="card-icon">Γä╣∩╕Å</div>
+            <h3 class="card-title">Word Info</h3>
+          </div>
+          <div class="card-content">
+            <div class="info-list">
+              <div class="info-item">
+                <span class="info-label">Length:</span>
+                <span class="info-value">{{ searchResult.word.length }} letters</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">In Collection:</span>
+                <span class="info-value">{{ searchResult.inCollection ? 'Yes Γ£à' : 'No' }}</span>
+              </div>
+              <div class="info-item" *ngIf="searchResult.oxford">
+                <span class="info-label">Dictionary:</span>
+                <span class="info-value">Oxford Verified ≡ƒÅå</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Performance Stats Panel -->
+  <div class="performance-panel" *ngIf="performanceStatsVisible && performanceStats">
+    <button class="close-performance-button" (click)="togglePerformanceStats()">Γ£û∩╕Å</button>
+    <h3 class="panel-title">ΓÜí Performance Stats</h3>
+    <div class="performance-content">
+      <div class="performance-section">
+        <h4 class="section-title">≡ƒôè System Status</h4>
+        <div class="performance-item">
+          <span class="performance-label">Words Loaded:</span>
+          <span class="performance-value">{{ performanceStats.words_loaded | number }}</span>
+        </div>
+        <div class="performance-item">
+          <span class="performance-label">Thread Pool Workers:</span>
+          <span class="performance-value">{{ performanceStats.thread_pool_workers }}</span>
+        </div>
+        <div class="performance-item">
+          <span class="performance-label">Process Pool Workers:</span>
+          <span class="performance-value">{{ performanceStats.process_pool_workers }}</span>
+        </div>
+      </div>
+      
+      <div class="performance-section">
+        <h4 class="section-title">≡ƒÆ╛ Memory Usage</h4>
+        <div class="performance-item">
+          <span class="performance-label">Words List Size:</span>
+          <span class="performance-value">{{ performanceStats.memory_usage.words_list_size | number }}</span>
+        </div>
+        <div class="performance-item">
+          <span class="performance-label">Words Set Size:</span>
+          <span class="performance-value">{{ performanceStats.memory_usage.words_set_size | number }}</span>
+        </div>
+      </div>
+      
+      <div class="performance-section">
+        <h4 class="section-title">≡ƒÜÇ Optimizations</h4>
+        <div class="optimization-list">
+          <div class="optimization-item" *ngFor="let feature of performanceStats.optimization_features">
+            Γ£à {{ feature }}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>

@@ -24,6 +24,8 @@ class OxfordValidator:
         })
         self.executor = ThreadPoolExecutor(max_workers=3)  # Limit concurrent requests
         self.cache = {}  # Simple in-memory cache
+        self.cache_hits = 0
+        self.cache_misses = 0
         self.rate_limit_delay = 1  # 1 second between requests to be respectful
         self.last_request_time = 0
         
@@ -55,9 +57,11 @@ class OxfordValidator:
         
         # Check cache first
         if word in self.cache:
+            self.cache_hits += 1
             logger.info(f"Cache hit for word: {word}")
             return self.cache[word]
         
+        self.cache_misses += 1
         try:
             loop = asyncio.get_event_loop()
             result = await loop.run_in_executor(self.executor, self._fetch_word_sync, word)
@@ -363,8 +367,13 @@ class OxfordValidator:
     
     def get_cache_stats(self) -> Dict:
         """Get cache statistics"""
+        total = self.cache_hits + self.cache_misses
+        rate = f"{(self.cache_hits / total * 100):.1f}%" if total > 0 else "0.0%"
         return {
             "cached_words": len(self.cache),
-            "cache_hit_rate": "Not tracked",  # Could be enhanced
-            "total_requests": "Not tracked"   # Could be enhanced
+            "cached_words_count": len(self.cache),
+            "hits": self.cache_hits,
+            "misses": self.cache_misses,
+            "cache_hit_rate": rate,
+            "total_requests": total
         }

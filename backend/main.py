@@ -15,6 +15,7 @@ from dotenv import load_dotenv
 from oxford_validator import OxfordValidator
 from synonym_service import get_synonym_service
 from word_manager import WordManager
+from puzzle_solver import match_pattern as advanced_match_pattern, match_regex, match_anagram
 
 # Import logging configuration
 from logger_config import (
@@ -68,9 +69,13 @@ app = FastAPI(
 )
 
 # Request logging middleware
+total_api_requests = 0
+
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     """Log all HTTP requests with performance monitoring"""
+    global total_api_requests
+    total_api_requests += 1
     request_id = str(uuid.uuid4())
     start_time = time.time()
     
@@ -371,7 +376,7 @@ async def prometheus_metrics():
             f"word_filter_total_words {len(words_list)}",
             f"# HELP word_filter_api_requests_total Total API requests",
             f"# TYPE word_filter_api_requests_total counter",
-            f"word_filter_api_requests_total 0"  # TODO: Implement counter
+            f"word_filter_api_requests_total {total_api_requests}"
         ]
         return "\n".join(metrics) + "\n"
     except Exception as e:
@@ -411,6 +416,13 @@ async def get_word_stats():
 async def check_word(word: str):
     """Fast word lookup using set for O(1) performance"""
     word_lower = word.lower().strip()
+    exists = word_lower in words_set
+    return {"word": word_lower, "exists": exists}
+
+@app.post("/words/check")
+async def check_word_post(request: AddWordReq):
+    """Fast word lookup via POST using set for O(1) performance"""
+    word_lower = request.word.lower().strip()
     exists = word_lower in words_set
     return {"word": word_lower, "exists": exists}
 
@@ -481,6 +493,52 @@ async def get_interactive_words(
         matched_words.extend(result)
         
     return matched_words[:500]
+
+@app.get("/words/puzzle", response_model=List[str])
+async def get_puzzle_words(
+    pattern: Optional[str] = Query(None, description="Pattern with known letters, ? for any, @ for vowels, # for consonants"),
+    regex: Optional[str] = Query(None, description="Regular expression pattern to match"),
+    anagram: Optional[str] = Query(None, description="Letters to match anagrams from"),
+    anagram_exact: bool = Query(False, description="Whether to require exact anagram match"),
+    limit: int = Query(100, ge=1, le=1000, description="Max results to return")
+):
+    """Find words matching advanced puzzle filters (wildcards, regex, and anagrams)"""
+    candidates = words_list
+    
+    if anagram:
+        candidates = [w for w in candidates if match_anagram(w, anagram, exact=anagram_exact)]
+        
+    if pattern:
+        candidates = [w for w in candidates if advanced_match_pattern(w, pattern)]
+        
+    if regex:
+        candidates = [w for w in candidates if match_regex(w, regex)]
+        
+    return candidates[:limit]
+
+@app.get("/words/random")
+async def get_random_word(
+    length: int = Query(5, ge=1, le=50, description="Length of the random word"),
+    starts_with: Optional[str] = Query(None, description="Word starts with letter"),
+    ends_with: Optional[str] = Query(None, description="Word ends with letter")
+):
+    """Get a random word from the dictionary matching constraints"""
+    import random
+    filtered = [w for w in words_list if len(w) == length]
+    if starts_with:
+        starts_with = starts_with.lower()
+        filtered = [w for w in filtered if w.startswith(starts_with)]
+    if ends_with:
+        ends_with = ends_with.lower()
+        filtered = [w for w in filtered if w.endswith(ends_with)]
+        
+    if not filtered:
+        raise HTTPException(status_code=404, detail="No matching words found")
+        
+    return {
+        "success": True,
+        "word": random.choice(filtered)
+    }
 
 @app.get("/performance/stats")
 async def get_performance_stats():

@@ -1,0 +1,4 @@
+# Cloudflare Pages Configuration
+name = "word-filter-app"
+pages_build_caching = true
+compatibility_date = "2026-06-23"

@@ -45,7 +45,7 @@ This package supports multiple deployment targets. Choose the one that fits your
 **Providers**:
 - DigitalOcean Droplets ($6/month)
 - Linode VPS ($5/month)
-- AWS EC2 (t2.micro free tier)
+- Civo Cloud Instance / VPS
 - Azure Virtual Machines
 - Google Compute Engine
 
@@ -65,27 +65,7 @@ This package supports multiple deployment targets. Choose the one that fits your
 
 ---
 
-## 3. ☁️ **AWS (Amazon Web Services)**
 
-**Best for**: Enterprise, scalability, AWS ecosystem
-
-**Services**:
-- **EC2**: Virtual servers
-- **ECS**: Container orchestration
-- **EKS**: Kubernetes
-- **Elastic Beanstalk**: Platform-as-a-Service
-
-**Deploy**:
-- See `AWS_SETUP.md` for detailed instructions
-- Use `terraform/` directory for infrastructure as code
-
-**Access**:
-- Via AWS-provided URL or custom domain
-
-**Pros**: ✅ Highly scalable, ✅ Enterprise features, ✅ Global CDN
-**Cons**: ❌ Complex, ❌ Can be expensive, ❌ Steep learning curve
-
----
 
 ## 4. ☸️ **Kubernetes (Any Provider)**
 
@@ -94,7 +74,6 @@ This package supports multiple deployment targets. Choose the one that fits your
 **Providers**:
 - **Civo**: Managed Kubernetes ($5/month)
 - **DigitalOcean**: Kubernetes ($12/month)
-- **AWS EKS**: Managed Kubernetes
 - **Google GKE**: Managed Kubernetes
 - **Azure AKS**: Managed Kubernetes
 - **Self-hosted**: Using kubeadm, k3s, or microk8s
@@ -256,7 +235,6 @@ heroku container:release web --app word-filter-app
 |--------|-----------|------------|----------|
 | Local | ⭐ Easy | Free | Development |
 | VPS | ⭐⭐ Medium | $5-20 | Small production |
-| AWS | ⭐⭐⭐⭐ Hard | $10-100+ | Enterprise |
 | Kubernetes | ⭐⭐⭐⭐ Hard | $5-50+ | High availability |
 | Docker Swarm | ⭐⭐⭐ Medium | $15-50 | Multi-node |
 | Azure | ⭐⭐⭐⭐ Hard | $10-100+ | Microsoft shops |
@@ -285,19 +263,17 @@ heroku container:release web --app word-filter-app
 → See `CIVO_DEPLOYMENT.md`
 
 ### For Production (Large/Enterprise)
-→ **AWS ECS/EKS** or **Azure AKS** or **GCP GKE**
-→ See `AWS_SETUP.md`
+→ **Azure AKS** or **GCP GKE**
 
 ---
 
 ## 📚 Related Documentation
 
 - `DEPLOY_TO_SERVER.md` - Deploy to any Linux server
-- `AWS_SETUP.md` - Deploy to AWS
 - `CIVO_DEPLOYMENT.md` - Deploy to Civo Kubernetes
 - `DEPLOYMENT_GUIDE.md` - General deployment guide
-- `k8s/` - Kubernetes manifests
-- `terraform/` - Infrastructure as code
+- `civo-k8s/` - Civo Kubernetes manifests
+- `civo-terraform/` - Civo Infrastructure as code
 
 ---
 
@@ -307,7 +283,7 @@ heroku container:release web --app word-filter-app
 1. **Testing locally?** → Run `.\deploy.ps1 up` right now!
 2. **Need it online?** → Get a $6/month DigitalOcean Droplet
 3. **Want Kubernetes?** → Try Civo ($5/month)
-4. **Enterprise needs?** → Go with AWS/Azure/GCP
+4. **Enterprise needs?** → Go with Azure/GCP
 
 ---
 

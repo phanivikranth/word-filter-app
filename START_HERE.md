@@ -44,7 +44,6 @@ chmod +x deploy.sh
 | `DEPLOYMENT_GUIDE.md` | Comprehensive deployment | Production setup |
 | `DEPLOYMENT_CHECKLIST.md` | Verification checklist | Testing deployment |
 | `PACKAGE_CONTENTS.md` | Package structure | Understanding files |
-| `AWS_SETUP.md` | AWS deployment | Deploying to AWS |
 | `CIVO_DEPLOYMENT.md` | Kubernetes deployment | Deploying to Civo |
 | `FEATURES.md` | Feature documentation | Learning features |
 | `TESTING.md` | Testing guide | Running tests |

@@ -130,9 +130,6 @@ kubectl apply -f k8s/ingress.yaml
 
 ### 3. Cloud Provider Deployment
 
-#### AWS
-See `AWS_SETUP.md` for detailed AWS deployment instructions.
-
 #### Civo Kubernetes
 See `CIVO_DEPLOYMENT.md` for Civo-specific instructions.
 

@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { HttpClientTestingModule } from '@angular/common/http/testing';
+import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { of, throwError, from } from 'rxjs';
 
 import { AppComponent } from './app.component';
@@ -46,13 +47,14 @@ describe('AppComponent', () => {
       'getWordStats',
       'getFilteredWords',
       'getInteractiveWords',
+      'getPuzzleWords',
       'searchBasicWord',
       'addWordWithValidation'
     ]);
 
     await TestBed.configureTestingModule({
       declarations: [AppComponent],
-      imports: [ReactiveFormsModule, FormsModule, HttpClientTestingModule],
+      imports: [ReactiveFormsModule, FormsModule, HttpClientTestingModule, NoopAnimationsModule],
       providers: [
         { provide: WordService, useValue: wordServiceSpy }
       ]
@@ -66,6 +68,7 @@ describe('AppComponent', () => {
     wordService.getWordStats.and.returnValue(of(mockWordStats));
     wordService.getFilteredWords.and.returnValue(of(mockWords));
     wordService.getInteractiveWords.and.returnValue(of(['apple', 'angle']));
+    wordService.getPuzzleWords.and.returnValue(of(['apple', 'angle']));
     wordService.searchBasicWord.and.returnValue(of(mockBasicSearchResult));
   });
 
@@ -74,7 +77,7 @@ describe('AppComponent', () => {
   });
 
   it('should have default values', () => {
-    expect(component.title).toBe('Word Filter App');
+    expect(component.title).toBe('terse');
     expect(component.searchMode).toBe('basic');
     expect(component.searchWord).toBe('');
     expect(component.searchResult).toBeNull();
@@ -328,7 +331,7 @@ describe('AppComponent', () => {
     it('should clean invalid characters from letter input', () => {
       component.letterBoxes = ['', '', '', '', ''];
       const mockEvent = {
-        target: { value: 'A1@' }
+        target: { value: 'A1$' }
       };
 
       component.updateLetter(1, mockEvent);
@@ -530,29 +533,28 @@ describe('AppComponent', () => {
       expect(mockAudio.play).toHaveBeenCalled();
     });
 
-    it('should handle pronunciation play error', async () => {
+    it('should handle pronunciation play error with speech fallback', async () => {
       const mockAudio = jasmine.createSpyObj('HTMLAudioElement', ['play']);
       mockAudio.play.and.returnValue(Promise.reject(new Error('Audio error')));
       spyOn(window, 'Audio').and.returnValue(mockAudio);
-      spyOn(console, 'error');
+      spyOn(component, 'speakWord');
 
-      component.playPronunciation('https://example.com/audio.mp3');
+      component.playPronunciation('https://example.com/audio.mp3', 'hello');
 
       expect(window.Audio).toHaveBeenCalledWith('https://example.com/audio.mp3');
       expect(mockAudio.play).toHaveBeenCalled();
-      
-      // Wait for the async error handling to complete
       await new Promise(resolve => setTimeout(resolve, 10));
-      
-      expect(console.error).toHaveBeenCalledWith('Error playing pronunciation:', jasmine.any(Error));
+      expect(component.speakWord).toHaveBeenCalledWith('hello');
     });
 
-    it('should not play pronunciation without URL', () => {
+    it('should speak word when no audio url is provided', () => {
       spyOn(window, 'Audio');
+      spyOn(component, 'speakWord');
 
-      component.playPronunciation('');
+      component.playPronunciation('', 'hello');
 
       expect(window.Audio).not.toHaveBeenCalled();
+      expect(component.speakWord).toHaveBeenCalledWith('hello');
     });
   });
 

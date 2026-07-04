@@ -1,0 +1,80 @@
+# Railway.app Production Configuration
+# Enterprise-Grade Deployment for FastAPI Backend
+
+name: word-filter-app-backend
+runtime: python
+
+# Build configuration
+build:
+  buildCommand: |
+    python -m pip install --upgrade pip setuptools wheel
+    pip install -r requirements.txt
+  startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+
+# Environment variables for Railway
+variables:
+  PORT: 8000
+  ENVIRONMENT: production
+  LOG_LEVEL: INFO
+  PYTHONUNBUFFERED: "1"
+  PYTHONDONTWRITEBYTECODE: "1"
+
+# Health checks for reliability
+healthchecks:
+  readinessProbe:
+    path: /health
+    initialDelaySeconds: 10
+    periodSeconds: 30
+    timeoutSeconds: 5
+    failureThreshold: 3
+  livenessProbe:
+    path: /health
+    initialDelaySeconds: 30
+    periodSeconds: 60
+    timeoutSeconds: 5
+    failureThreshold: 3
+
+# Automatic scaling based on metrics
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetMemory: 70
+  targetCPU: 75
+
+# Resource limits for optimal performance
+resources:
+  memory: 512Mi
+  cpu: 0.5
+
+# Rolling update strategy
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 0
+
+# Networking
+networking:
+  serviceType: ClusterIP
+  ingressEnabled: true
+  corsEnabled: true
+  corsAllowOrigins:
+    - "*"  # Will be restricted by CORS_ORIGINS env var
+  corsAllowMethods:
+    - GET
+    - POST
+    - PUT
+    - DELETE
+    - OPTIONS
+  corsAllowHeaders:
+    - Content-Type
+    - Authorization
+
+# Persistence (if needed for file uploads)
+persistence:
+  enabled: false
+  # If enabled:
+  # size: 10Gi
+  # mountPath: /app/data
+  # storageClass: railway-storage

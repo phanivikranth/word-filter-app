@@ -1,0 +1,76 @@
+name = "word-filter-app"
+type = "javascript"
+account_id = "your_account_id_here"
+workers_dev = false
+main = "src/index.ts"
+
+# Cloudflare Pages configuration
+pages_build_caching = true
+
+# Route configurations
+route = "example.com/*"
+
+# Environment configurations
+[env.production]
+name = "word-filter-app-prod"
+route = "example.com/*"
+account_id = "your_account_id_here"
+
+[env.production.vars]
+BACKEND_URL = "https://word-filter-backend-railway.railway.app"
+ENVIRONMENT = "production"
+API_VERSION = "2.2.0"
+LOG_LEVEL = "info"
+
+[env.staging]
+name = "word-filter-app-staging"
+route = "staging.example.com/*"
+
+[env.staging.vars]
+BACKEND_URL = "https://word-filter-backend-staging.railway.app"
+ENVIRONMENT = "staging"
+API_VERSION = "2.2.0"
+LOG_LEVEL = "debug"
+
+# Analytics Engine binding (optional)
+[[analytics_engine_datasets]]
+binding = "ANALYTICS"
+
+# KV Namespace for caching and sessions
+[[kv_namespaces]]
+binding = "CACHE"
+id = "your_kv_namespace_id"
+preview_id = "your_kv_namespace_preview_id"
+
+# R2 bucket binding for storage (if using for word files)
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "word-filter-assets"
+preview_bucket_name = "word-filter-assets-preview"
+
+# D1 Database binding (if using D1 for words database)
+[[d1_databases]]
+binding = "DB"
+database_name = "word_filter_db"
+database_id = "your_database_id"
+preview_database_id = "your_preview_database_id"
+
+# Limits
+limit_concurrent_requests = true
+max_request_size_mb = 50
+
+# Performance settings
+minify = true
+tail_consumers = []
+
+# Build settings
+build_watch_paths = ["src/**/*.ts", "src/**/*.tsx"]
+
+[build]
+cwd = "./"
+command = "npm run build"
+watch_paths = ["src/**/*.ts"]
+
+# Triggers for automatic deployment
+[triggers]
+crons = ["0 0 * * *"]  # Daily maintenance

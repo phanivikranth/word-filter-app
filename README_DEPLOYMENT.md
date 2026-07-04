@@ -62,7 +62,7 @@ chmod +x deploy.sh
 ✅ **Documentation**
 - `DEPLOYMENT_GUIDE.md` - Comprehensive deployment guide
 - `README_DEPLOYMENT.md` - This quick start guide
-- Existing guides for AWS, Civo, Kubernetes
+- Existing guides for Civo and Kubernetes
 
 ✅ **Configuration**
 - `.env.example` - Environment template
@@ -112,9 +112,8 @@ Check logs:
 ## Next Steps
 
 - Read `DEPLOYMENT_GUIDE.md` for detailed production deployment
-- Check `AWS_SETUP.md` for AWS deployment
-- See `CIVO_DEPLOYMENT.md` for Kubernetes deployment
-- Review `k8s/` directory for Kubernetes manifests
+- See `CIVO_DEPLOYMENT.md` for Civo Kubernetes deployment
+- Review `civo-k8s/` directory for Civo Kubernetes manifests
 
 ## Support
 

@@ -1,25 +1,192 @@
 #!/usr/bin/env python3
 """
-Word validation script using Oxford Dictionary
-Validates all words in words.txt and creates invalid_words.txt
+Word validation script using Merriam-Webster + Oxford Dictionary APIs
+Validates all words in words.txt and creates valid_words.txt and invalid_words.txt
 """
 
+import argparse
 import asyncio
+import json
 import logging
+import os
 import sys
 from pathlib import Path
 from typing import List, Dict
-from oxford_validator import OxfordValidator
+
+# Run from backend/ regardless of current working directory.
+BACKEND_DIR = Path(__file__).resolve().parent
+os.chdir(BACKEND_DIR)
+if str(BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(BACKEND_DIR))
+
+try:
+    from oxford_validator import OxfordValidator
+    from merriam_webster_validator import MerriamWebsterValidator
+    from oxford_dictionaries_api_validator import OxfordDictionariesApiValidator
+    from freedictionary_service import FreeDictionaryService
+    from unified_word_lookup import UnifiedWordLookup, BULK_VALIDATE_SOURCE_ORDER
+except ModuleNotFoundError as exc:
+    print(
+        "Missing Python dependencies. Use the project virtualenv:\n"
+        "  cd backend\n"
+        "  venv\\Scripts\\python.exe validate_words.py --fresh\n"
+        f"\nOriginal error: {exc}",
+        file=sys.stderr,
+    )
+    sys.exit(1)
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+CHECKPOINT_FILE = "validation_checkpoint.json"
+API_CHOICES = ("combined", "oxford", "oxford-api", "merriam", "freedictionary")
+
+
+def resolve_word_file_paths(
+    input_file: str,
+    valid_output: str | None = None,
+    invalid_output: str | None = None,
+    checkpoint_file: str | None = None,
+) -> Dict[str, str]:
+    """Derive input/output/checkpoint paths from an input word list file."""
+    input_path = Path(input_file)
+    if not input_path.is_absolute():
+        input_path = (BACKEND_DIR / input_path).resolve()
+
+    stem = input_path.stem
+    parent = input_path.parent
+
+    valid_path = Path(valid_output) if valid_output else parent / f"{stem}_valid.txt"
+    invalid_path = Path(invalid_output) if invalid_output else parent / f"{stem}_invalid.txt"
+    if not valid_output and input_path.name == "words.txt":
+        valid_path = parent / "valid_words.txt"
+        invalid_path = parent / "invalid_words.txt"
+    checkpoint_path = (
+        Path(checkpoint_file)
+        if checkpoint_file
+        else parent / f"validation_checkpoint_{stem}.json"
+    )
+    if not checkpoint_file and input_path.name == "words.txt":
+        checkpoint_path = parent / CHECKPOINT_FILE
+
+    def _resolve(path: Path) -> Path:
+        return path.resolve() if path.is_absolute() else (BACKEND_DIR / path).resolve()
+
+    return {
+        "words_file": str(_resolve(input_path)),
+        "valid_words_file": str(_resolve(valid_path)),
+        "invalid_words_file": str(_resolve(invalid_path)),
+        "checkpoint_file": str(_resolve(checkpoint_path)),
+    }
+
+
 class WordValidationProcessor:
-    def __init__(self):
+    def __init__(
+        self,
+        api_mode: str = "combined",
+        concurrency: int = 20,
+        *,
+        words_file: str = "words.txt",
+        valid_words_file: str | None = None,
+        invalid_words_file: str | None = None,
+        checkpoint_file: str | None = None,
+        request_delay: float = 2.0,
+    ):
+        if api_mode not in API_CHOICES:
+            raise ValueError(f"api_mode must be one of {API_CHOICES}")
+
+        paths = resolve_word_file_paths(
+            words_file,
+            valid_output=valid_words_file,
+            invalid_output=invalid_words_file,
+            checkpoint_file=checkpoint_file,
+        )
+
+        self.api_mode = api_mode
+        self.concurrency = max(1, min(concurrency, 50))
+        self.request_delay = max(0.0, request_delay)
+        self.words_file = paths["words_file"]
+        self.valid_words_file = paths["valid_words_file"]
+        self.invalid_words_file = paths["invalid_words_file"]
+        self.checkpoint_file = paths["checkpoint_file"]
+
         self.oxford_validator = OxfordValidator()
-        self.words_file = "words.txt"
-        self.invalid_words_file = "invalid_words.txt"
+        self.oxford_validator.set_concurrency(self.concurrency)
+        self.merriam_validator = MerriamWebsterValidator(
+            api_key=os.getenv("MERRIAM_WEBSTER_API_KEY")
+        )
+        self.oxford_api_validator = OxfordDictionariesApiValidator()
+        self.freedictionary_service = FreeDictionaryService(
+            request_delay=self.request_delay
+        )
+        self.freedictionary_service.set_concurrency(self.concurrency)
+        self.unified_lookup = UnifiedWordLookup(
+            self.oxford_validator,
+            self.merriam_validator,
+            self.oxford_api_validator,
+            self.freedictionary_service,
+        )
+
+    async def _validate_batch(self, batch: List[str]) -> Dict:
+        """Validate a batch using the selected API mode."""
+        concurrent = self.concurrency
+        if self.api_mode == "oxford":
+            return await self.oxford_validator.validate_words_batch(
+                batch, max_concurrent=concurrent
+            )
+        if self.api_mode == "oxford-api":
+            return await self.oxford_api_validator.validate_words_batch(
+                batch, max_concurrent=concurrent
+            )
+        if self.api_mode == "merriam":
+            return await self.merriam_validator.validate_words_batch(
+                batch, max_concurrent=concurrent
+            )
+        if self.api_mode == "freedictionary":
+            return await self.freedictionary_service.validate_words_batch(
+                batch, max_concurrent=concurrent
+            )
+        return await self.unified_lookup.validate_words_batch(
+            batch,
+            source_order=BULK_VALIDATE_SOURCE_ORDER,
+            max_concurrent=concurrent,
+        )
+
+    def _log_api_mode(self) -> None:
+        if self.api_mode == "oxford":
+            logger.info("API mode: Oxford web only (Merriam-Webster and Oxford API disabled)")
+        elif self.api_mode == "oxford-api":
+            stats = self.oxford_api_validator.get_usage_stats()
+            logger.info(
+                "API mode: Oxford Dictionaries API only — %s/%s requests remaining today",
+                stats["remaining_today"],
+                stats["daily_limit"],
+            )
+        elif self.api_mode == "merriam":
+            stats = self.merriam_validator.get_usage_stats()
+            logger.info(
+                "API mode: Merriam-Webster only (Oxford disabled) — %s/%s requests remaining today",
+                stats["remaining_today"],
+                stats["daily_limit"],
+            )
+        elif self.api_mode == "freedictionary":
+            logger.info(
+                "API mode: TheFreeDictionary only — delay %.1fs between requests, concurrency %s",
+                self.request_delay,
+                self.concurrency,
+            )
+        else:
+            mw_stats = self.merriam_validator.get_usage_stats()
+            oda_stats = self.oxford_api_validator.get_usage_stats()
+            logger.info(
+                "API mode: Combined — Oxford web -> TheFreeDictionary -> "
+                "Merriam-Webster (%s/%s) -> Oxford API (%s/%s)",
+                mw_stats["remaining_today"],
+                mw_stats["daily_limit"],
+                oda_stats["remaining_today"],
+                oda_stats["daily_limit"],
+            )
         
     def load_words(self) -> List[str]:
         """Load all words from words.txt"""
@@ -32,9 +199,20 @@ class WordValidationProcessor:
             logger.error(f"File {self.words_file} not found!")
             sys.exit(1)
     
-    async def validate_all_words(self, words: List[str], batch_size: int = 20) -> Dict:
+    async def validate_all_words(
+        self,
+        words: List[str],
+        batch_size: int = 20,
+        resume: bool = True,
+        batch_delay: float = 1.0,
+    ) -> Dict:
         """
-        Validate all words using Oxford Dictionary
+        Validate words using the selected API (--api).
+
+        combined: Oxford web -> TheFreeDictionary -> Merriam-Webster -> Oxford Dictionaries API
+        oxford:   Oxford Learner's web scraper only
+        oxford-api: Official Oxford Dictionaries API only (500/day)
+        merriam:  Merriam-Webster only (1,000/day)
         
         Returns:
         {
@@ -42,10 +220,17 @@ class WordValidationProcessor:
             "valid_words": int,
             "invalid_words": int,
             "invalid_word_list": [str],
+            "valid_word_list": [str],
             "validation_results": [Dict]
         }
         """
-        logger.info(f"Starting Oxford validation of {len(words)} words")
+        logger.info(f"Starting dictionary validation of {len(words)} words")
+        self._log_api_mode()
+        logger.info(
+            "Parallel lookups: up to %s words at a time (batch size: %s)",
+            self.concurrency,
+            batch_size,
+        )
         logger.info("This may take several minutes - please be patient...")
         
         if not words:
@@ -54,65 +239,202 @@ class WordValidationProcessor:
                 "valid_words": 0,
                 "invalid_words": 0,
                 "invalid_word_list": [],
+                "valid_word_list": [],
                 "validation_results": []
             }
+
+        start_index = 0
+        valid_words: List[str] = []
+        invalid_words: List[str] = []
+
+        if resume:
+            checkpoint = self.load_checkpoint()
+            checkpoint_api = checkpoint.get("api", "combined")
+            checkpoint_concurrency = checkpoint.get("concurrency", self.concurrency)
+            checkpoint_input = checkpoint.get("input_file", self.words_file)
+            if checkpoint.get("processed_index", 0) > 0 and checkpoint_api != self.api_mode:
+                logger.error(
+                    "Checkpoint was created with --api %s but you requested --api %s. "
+                    "Use the same --api or run with --fresh to start over.",
+                    checkpoint_api,
+                    self.api_mode,
+                )
+                sys.exit(1)
+            if (
+                checkpoint.get("processed_index", 0) > 0
+                and str(Path(checkpoint_input).resolve())
+                != str(Path(self.words_file).resolve())
+            ):
+                logger.error(
+                    "Checkpoint was created for input file %s but you requested %s. "
+                    "Use the same --input or run with --fresh to start over.",
+                    checkpoint_input,
+                    self.words_file,
+                )
+                sys.exit(1)
+            if (
+                checkpoint.get("processed_index", 0) > 0
+                and checkpoint_concurrency != self.concurrency
+            ):
+                logger.error(
+                    "Checkpoint was created with --concurrency %s but you requested %s. "
+                    "Use the same --concurrency or run with --fresh to start over.",
+                    checkpoint_concurrency,
+                    self.concurrency,
+                )
+                sys.exit(1)
+            start_index = checkpoint.get("processed_index", 0)
+            if start_index > 0:
+                logger.info(
+                    f"Resuming from checkpoint at word {start_index}/{len(words)} "
+                    f"({checkpoint.get('valid_count', 0)} valid, "
+                    f"{checkpoint.get('invalid_count', 0)} invalid so far)"
+                )
+                if Path(self.valid_words_file).exists():
+                    with open(self.valid_words_file, "r", encoding="utf-8") as file:
+                        valid_words = [line.strip() for line in file if line.strip()]
+                if Path(self.invalid_words_file).exists():
+                    with open(self.invalid_words_file, "r", encoding="utf-8") as file:
+                        invalid_words = [line.strip() for line in file if line.strip()]
+        else:
+            for path in (
+                self.valid_words_file,
+                self.invalid_words_file,
+                self.checkpoint_file,
+            ):
+                p = Path(path)
+                if p.exists():
+                    p.unlink()
         
         # Process in batches to avoid overwhelming Oxford API
         all_results = []
-        invalid_words = []
-        processed_count = 0
+        processed_count = start_index
         
-        for i in range(0, len(words), batch_size):
+        for i in range(start_index, len(words), batch_size):
             batch = words[i:i + batch_size]
-            batch_num = i//batch_size + 1
+            batch_num = i // batch_size + 1
             total_batches = (len(words) + batch_size - 1) // batch_size
             
             logger.info(f"Processing batch {batch_num}/{total_batches} ({len(batch)} words)")
             
             try:
-                batch_result = await self.oxford_validator.validate_words_batch(batch)
+                batch_result = await self._validate_batch(batch)
                 all_results.extend(batch_result["results"])
                 
-                # Collect invalid words
+                batch_valid: List[str] = []
+                batch_invalid: List[str] = []
                 for result in batch_result["results"]:
-                    if not result["is_valid"]:
+                    if result["is_valid"]:
+                        batch_valid.append(result["word"])
+                        valid_words.append(result["word"])
+                    else:
+                        batch_invalid.append(result["word"])
                         invalid_words.append(result["word"])
                     processed_count += 1
-                
+
+                self.append_word_lists(batch_valid, batch_invalid)
+                self.save_checkpoint(processed_count, len(valid_words), len(invalid_words))
                 # Show progress every 100 words
                 if processed_count % 100 == 0:
-                    logger.info(f"Progress: {processed_count}/{len(words)} words processed")
+                    logger.info(
+                        f"Progress: {processed_count}/{len(words)} words processed "
+                        f"({len(valid_words)} valid, {len(invalid_words)} invalid)"
+                    )
                 
-                # Small delay between batches to be respectful to Oxford API
-                await asyncio.sleep(2)
+                # Optional pause between batches (rate-limit friendly)
+                if batch_delay > 0:
+                    await asyncio.sleep(batch_delay)
                 
             except Exception as e:
                 logger.error(f"Error processing batch {batch_num}: {e}")
                 # Continue with next batch
                 continue
         
-        valid_count = len(words) - len(invalid_words)
+        valid_count = len(valid_words)
         
         logger.info(f"Validation complete: {valid_count}/{len(words)} words are valid")
         logger.info(f"Found {len(invalid_words)} invalid words")
+        
+        self.clear_checkpoint()
+        # Rewrite sorted final files
+        self.save_word_lists(valid_words, invalid_words)
         
         return {
             "total_words": len(words),
             "valid_words": valid_count,
             "invalid_words": len(invalid_words),
             "invalid_word_list": invalid_words,
+            "valid_word_list": valid_words,
             "validation_results": all_results
         }
     
-    def save_invalid_words(self, invalid_words: List[str]):
-        """Save invalid words to invalid_words.txt"""
+    def save_word_lists(self, valid_words: List[str], invalid_words: List[str]):
+        """Save valid and invalid words to separate files"""
         try:
+            with open(self.valid_words_file, "w", encoding="utf-8") as file:
+                for word in sorted(valid_words):
+                    file.write(f"{word}\n")
+            logger.info(f"Saved {len(valid_words)} valid words to {self.valid_words_file}")
+
             with open(self.invalid_words_file, "w", encoding="utf-8") as file:
                 for word in sorted(invalid_words):
                     file.write(f"{word}\n")
             logger.info(f"Saved {len(invalid_words)} invalid words to {self.invalid_words_file}")
         except Exception as e:
-            logger.error(f"Error saving invalid words: {e}")
+            logger.error(f"Error saving word lists: {e}")
+
+    def append_word_lists(self, valid_words: List[str], invalid_words: List[str]):
+        """Append batch results to output files"""
+        if valid_words:
+            with open(self.valid_words_file, "a", encoding="utf-8") as file:
+                for word in valid_words:
+                    file.write(f"{word}\n")
+        if invalid_words:
+            with open(self.invalid_words_file, "a", encoding="utf-8") as file:
+                for word in invalid_words:
+                    file.write(f"{word}\n")
+
+    def load_checkpoint(self) -> Dict:
+        path = Path(self.checkpoint_file)
+        if not path.exists():
+            return {
+                "processed_index": 0,
+                "valid_count": 0,
+                "invalid_count": 0,
+                "api": self.api_mode,
+                "concurrency": self.concurrency,
+                "input_file": self.words_file,
+                "request_delay": self.request_delay,
+            }
+        with open(path, "r", encoding="utf-8") as file:
+            data = json.load(file)
+        if "api" not in data:
+            data["api"] = "combined"
+        if "concurrency" not in data:
+            data["concurrency"] = self.concurrency
+        if "input_file" not in data:
+            data["input_file"] = self.words_file
+        return data
+
+    def save_checkpoint(self, processed_index: int, valid_count: int, invalid_count: int):
+        with open(self.checkpoint_file, "w", encoding="utf-8") as file:
+            json.dump(
+                {
+                    "processed_index": processed_index,
+                    "valid_count": valid_count,
+                    "invalid_count": invalid_count,
+                    "api": self.api_mode,
+                    "concurrency": self.concurrency,
+                    "input_file": self.words_file,
+                    "request_delay": self.request_delay,
+                },
+                file,
+            )
+
+    def clear_checkpoint(self):
+        path = Path(self.checkpoint_file)
+        if path.exists():
+            path.unlink()
     
     def remove_invalid_words_from_original(self, invalid_words: List[str]) -> Dict:
         """
@@ -157,7 +479,7 @@ class WordValidationProcessor:
     def display_summary(self, validation_result: Dict):
         """Display validation summary"""
         print("\n" + "="*60)
-        print("📊 OXFORD DICTIONARY VALIDATION RESULTS")
+        print("DICTIONARY VALIDATION RESULTS")
         print("="*60)
         print(f"Total Words Processed: {validation_result['total_words']:,}")
         print(f"Valid Words: {validation_result['valid_words']:,}")
@@ -170,56 +492,134 @@ class WordValidationProcessor:
         print("="*60)
         
         if validation_result['invalid_words'] > 0:
-            print(f"\n❌ Found {validation_result['invalid_words']} invalid words")
+            print(f"\nFound {validation_result['invalid_words']} invalid words")
             print("Sample invalid words:")
             for word in validation_result['invalid_word_list'][:10]:
                 print(f"   - {word}")
             if len(validation_result['invalid_word_list']) > 10:
                 print(f"   ... and {len(validation_result['invalid_word_list']) - 10} more")
         else:
-            print("\n✅ All words are valid!")
+            print("\nAll words are valid!")
 
 async def main():
     """Main validation process"""
-    processor = WordValidationProcessor()
-    
-    print("🚀 Starting Oxford Dictionary Word Validation")
-    print(f"📁 Processing: {processor.words_file}")
-    print(f"📝 Invalid words will be saved to: {processor.invalid_words_file}")
+    parser = argparse.ArgumentParser(
+        description="Validate a word list using dictionary APIs"
+    )
+    parser.add_argument(
+        "--input",
+        "-i",
+        default="words.txt",
+        help="Input word list file (default: words.txt). Outputs: <stem>_valid.txt and <stem>_invalid.txt",
+    )
+    parser.add_argument(
+        "--valid-output",
+        help="Override valid-words output path (default: <input_stem>_valid.txt)",
+    )
+    parser.add_argument(
+        "--invalid-output",
+        help="Override invalid-words output path (default: <input_stem>_invalid.txt)",
+    )
+    parser.add_argument("--fresh", action="store_true", help="Start over (ignore checkpoint)")
+    parser.add_argument("--batch-size", type=int, default=20, help="Words per checkpoint batch (default: 20)")
+    parser.add_argument(
+        "--concurrency",
+        type=int,
+        default=None,
+        help="Max parallel word lookups per batch (default: 1 for freedictionary, 20 otherwise; max: 50)",
+    )
+    parser.add_argument(
+        "--batch-delay",
+        type=float,
+        default=None,
+        help="Seconds between batches (default: 5 for freedictionary, 1 otherwise; use 0 for none)",
+    )
+    parser.add_argument(
+        "--request-delay",
+        type=float,
+        default=None,
+        help="Seconds between TheFreeDictionary HTTP requests (default: 4 for freedictionary API mode)",
+    )
+    parser.add_argument(
+        "--api",
+        choices=API_CHOICES,
+        default="combined",
+        help=(
+            "Dictionary API: combined (default), oxford, oxford-api, merriam, "
+            "freedictionary = TheFreeDictionary only (slow, IP-safe)"
+        ),
+    )
+    args = parser.parse_args()
+
+    if args.concurrency is None:
+        args.concurrency = 1 if args.api == "freedictionary" else 20
+    if args.batch_delay is None:
+        args.batch_delay = 5.0 if args.api == "freedictionary" else 1.0
+    if args.request_delay is None:
+        args.request_delay = 4.0 if args.api == "freedictionary" else 2.0
+
+    if args.concurrency < 1 or args.concurrency > 50:
+        parser.error("--concurrency must be between 1 and 50")
+    if args.batch_delay < 0:
+        parser.error("--batch-delay must be >= 0")
+    if args.request_delay < 0:
+        parser.error("--request-delay must be >= 0")
+
+    processor = WordValidationProcessor(
+        api_mode=args.api,
+        concurrency=args.concurrency,
+        words_file=args.input,
+        valid_words_file=args.valid_output,
+        invalid_words_file=args.invalid_output,
+        request_delay=args.request_delay,
+    )
+
+    api_labels = {
+        "combined": "Oxford web -> TheFreeDictionary -> Merriam-Webster -> Oxford API",
+        "oxford": "Oxford web scraper only",
+        "oxford-api": "Oxford Dictionaries API only (500/day)",
+        "merriam": "Merriam-Webster only",
+        "freedictionary": "TheFreeDictionary only (dictionary + encyclopedia)",
+    }
+    print(f"Starting Dictionary Word Validation - {api_labels[args.api]}")
+    print(f"Input:  {processor.words_file}")
+    print(f"Valid:  {processor.valid_words_file}")
+    print(f"Invalid: {processor.invalid_words_file}")
+    print(f"Checkpoint: {processor.checkpoint_file}")
+    print(f"Parallel lookups: up to {args.concurrency} words at a time")
+    print(f"Batch size (checkpoint): {args.batch_size}")
+    if args.api == "freedictionary":
+        print(f"Request delay (TheFreeDictionary): {args.request_delay}s per HTTP call")
+    print(f"Batch delay: {args.batch_delay}s")
     print("\n" + "-"*60)
     
     # Step 1: Load words
     words = processor.load_words()
+    print(f"Total words to validate: {len(words):,}")
+    print("Note: Full validation of 400k+ words can take many hours due to API rate limits.")
+    print("Progress is checkpointed - you can stop and resume later.\n")
     
     # Step 2: Validate all words
-    validation_result = await processor.validate_all_words(words)
+    validation_result = await processor.validate_all_words(
+        words,
+        batch_size=args.batch_size,
+        resume=not args.fresh,
+        batch_delay=args.batch_delay,
+    )
     
-    # Step 3: Save invalid words
-    if validation_result['invalid_words'] > 0:
-        processor.save_invalid_words(validation_result['invalid_word_list'])
+    # Step 3: Save final word lists (also done incrementally during run)
+    processor.save_word_lists(
+        validation_result["valid_word_list"],
+        validation_result["invalid_word_list"],
+    )
     
     # Step 4: Display summary
     processor.display_summary(validation_result)
     
-    # Step 5: Ask for permission to remove invalid words
-    if validation_result['invalid_words'] > 0:
-        print(f"\n🗑️  REMOVAL CONFIRMATION")
-        print("-"*40)
-        print(f"Current words in {processor.words_file}: {validation_result['total_words']:,}")
-        print(f"Invalid words to remove: {validation_result['invalid_words']:,}")
-        print(f"Words remaining after removal: {validation_result['valid_words']:,}")
-        print(f"Backup saved as: words_new.txt")
-        
-        return {
-            'validation_result': validation_result,
-            'processor': processor
-        }
-    else:
-        print("\n✅ No invalid words found - no cleanup needed!")
-        return {
-            'validation_result': validation_result,
-            'processor': processor
-        }
+    return {
+        'validation_result': validation_result,
+        'processor': processor
+    }
 
 if __name__ == "__main__":
     asyncio.run(main())

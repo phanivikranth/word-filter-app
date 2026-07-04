@@ -42,7 +42,7 @@ class TestOxfordDictionaryIntegration:
         """Test word validation when word is not found in Oxford Dictionary"""
         with patch('main.oxford_validator.validate_word') as mock_validate:
             mock_validate.return_value = {
-                "word": "xyzzyx123",
+                "word": "xyzzyx",
                 "is_valid": False,
                 "definitions": [],
                 "word_forms": [],
@@ -52,14 +52,14 @@ class TestOxfordDictionaryIntegration:
             
             response = sync_client.post(
                 "/words/validate",
-                json={"word": "xyzzyx123", "skip_oxford": False}
+                json={"word": "xyzzyx", "skip_oxford": False}
             )
             
             assert response.status_code == 200
             data = response.json()
             
             assert data["success"] == True
-            assert data["word"] == "xyzzyx123"
+            assert data["word"] == "xyzzyx"
             assert data["oxford_validation"]["is_valid"] == False
             assert data["oxford_validation"]["reason"] == "Not found in Oxford Dictionary"
 
@@ -140,7 +140,7 @@ class TestOxfordDictionaryIntegration:
         """Test adding a word when Oxford Dictionary validation fails"""
         with patch('main.oxford_validator.validate_word') as mock_validate:
             mock_validate.return_value = {
-                "word": "invalidword123",
+                "word": "invalidword",
                 "is_valid": False,
                 "definitions": [],
                 "word_forms": [],
@@ -150,14 +150,14 @@ class TestOxfordDictionaryIntegration:
             
             response = sync_client.post(
                 "/words/add-validated",
-                json={"word": "invalidword123", "skip_oxford": False}
+                json={"word": "invalidword", "skip_oxford": False}
             )
             
             assert response.status_code == 200
             data = response.json()
             
             assert data["success"] == False
-            assert data["word"] == "invalidword123"
+            assert data["word"] == "invalidword"
             assert "not found in Oxford Dictionary" in data["message"]
 
     def test_add_word_skip_oxford_validation(self, sync_client, temp_words_file):

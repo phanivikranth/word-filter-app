@@ -50,21 +50,17 @@ fullstack-app/
 │       │   └── 📁 models/          # TypeScript interfaces
 │       └── 📁 environments/        # Environment configs
 │
-├── 📁 k8s/                         # Kubernetes manifests (optional)
+├── 📁 civo-k8s/                    # Civo Kubernetes manifests
 │   ├── namespace.yaml
 │   ├── backend-deployment.yaml
 │   ├── frontend-deployment.yaml
 │   └── ingress.yaml
 │
 ├── 📁 scripts/                     # Utility scripts
-│   ├── build-and-deploy.sh
-│   ├── build-and-deploy.ps1
 │   └── 📁 civo/                    # Civo-specific scripts
 │
 └── 📁 Documentation/
-    ├── AWS_SETUP.md                # AWS deployment guide
     ├── CIVO_DEPLOYMENT.md          # Civo Kubernetes guide
-    ├── DEPLOYMENT.md               # General deployment info
     ├── FEATURES.md                 # Application features
     ├── TESTING.md                  # Testing documentation
     └── OXFORD_INTEGRATION.md       # Oxford API integration
@@ -204,15 +200,11 @@ fullstack-app/
 | `README_DEPLOYMENT.md` | Quick deployment guide (3 steps) |
 | `DEPLOYMENT_GUIDE.md` | Comprehensive deployment documentation |
 | `PACKAGE_CONTENTS.md` | This file - package structure and contents |
-| `AWS_SETUP.md` | AWS-specific deployment instructions |
 | `CIVO_DEPLOYMENT.md` | Civo Kubernetes deployment guide |
-| `DEPLOYMENT.md` | General deployment strategies |
 | `FEATURES.md` | Detailed feature documentation |
 | `TESTING.md` | Testing guidelines and commands |
 | `OXFORD_INTEGRATION.md` | Oxford Dictionary API integration |
 | `COLOR_SCHEME_GUIDE.md` | UI color scheme documentation |
-| `GITHUB_SETUP.md` | GitHub repository setup |
-| `S3_DEPLOYMENT_GUIDE.md` | AWS S3 deployment guide |
 
 ---
 
@@ -295,11 +287,10 @@ npm test
 
 ### 2. **Kubernetes** (For production clusters)
 ```bash
-kubectl apply -f k8s/
+kubectl apply -f civo-k8s/
 ```
 
 ### 3. **Cloud Providers**
-- **AWS**: ECS, EKS, or EC2 with Docker
 - **Civo**: Kubernetes cluster
 - **Azure**: AKS or Container Instances
 - **GCP**: GKE or Cloud Run
@@ -353,7 +344,7 @@ For deployment issues:
 1. Check `README_DEPLOYMENT.md` for quick start
 2. Review `DEPLOYMENT_GUIDE.md` for detailed instructions
 3. Check logs: `./deploy.sh logs`
-4. Review specific guides (AWS, Civo, etc.)
+4. Review Civo Cloud specific guides
 
 ---
 

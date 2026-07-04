@@ -2,8 +2,9 @@
 Pytest configuration and shared fixtures
 """
 import pytest
+import pytest_asyncio
 import asyncio
-from typing import AsyncGenerator, Generator
+from typing import AsyncGenerator, Generator, Optional
 from httpx import AsyncClient
 from fastapi.testclient import TestClient
 import tempfile
@@ -15,8 +16,9 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 # Create a test app instance
-from fastapi import FastAPI
+from fastapi import FastAPI, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+import main
 
 # Simple test app for testing
 def create_test_app():
@@ -31,6 +33,9 @@ def create_test_app():
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    
+    # Cache for validate endpoint to support testing cache functionality
+    validate_cache = {}
     
     # Mock word data for testing
     test_words = [
@@ -61,13 +66,13 @@ def create_test_app():
     
     @test_app.get("/words")
     async def get_words(
-        limit: int = 100,
-        contains: str = None,
-        starts_with: str = None,
-        ends_with: str = None,
-        min_length: int = None,
-        max_length: int = None,
-        exact_length: int = None
+        limit: Optional[int] = Query(100, ge=1, le=1000),
+        contains: Optional[str] = Query(None),
+        starts_with: Optional[str] = Query(None),
+        ends_with: Optional[str] = Query(None),
+        min_length: Optional[int] = Query(None, ge=1),
+        max_length: Optional[int] = Query(None, ge=1),
+        exact_length: Optional[int] = Query(None, ge=1)
     ):
         filtered_words = test_words.copy()
         
@@ -104,39 +109,51 @@ def create_test_app():
     # Oxford Dictionary integration endpoints
     @test_app.post("/words/validate")
     async def validate_word(request: dict):
-        word = request.get("word", "").lower()
+        word = request.get("word", "").strip()
+        if not word:
+            raise HTTPException(status_code=400, detail="Word cannot be empty")
+        if not word.isalpha():
+            raise HTTPException(status_code=400, detail="Word must contain only letters")
+            
+        word_lower = word.lower()
         skip_oxford = request.get("skip_oxford", False)
         
-        if skip_oxford:
-            return {
-                "success": True,
-                "word": word,
-                "oxford_validation": {
-                    "word": word,
-                    "is_valid": True,
-                    "definitions": ["Test definition"],
-                    "word_forms": ["noun"],
-                    "examples": ["This is a test example."],
-                    "reason": "Skipped Oxford validation"
-                },
-                "message": f"Validation complete for '{word}'"
-            }
+        if word_lower in validate_cache and not skip_oxford:
+            return validate_cache[word_lower]
         
-        # Mock Oxford validation - be more strict for testing
-        is_valid = word in test_words or (len(word) > 2 and word.isalpha())
-        return {
+        if skip_oxford:
+            validation_result = {
+                "word": word_lower,
+                "is_valid": True,
+                "definitions": ["Test definition"],
+                "word_forms": ["noun"],
+                "examples": ["This is a test example."],
+                "reason": "Skipped Oxford validation"
+            }
+        else:
+            try:
+                validation_result = await main.oxford_validator.validate_word(word_lower)
+            except Exception as e:
+                validation_result = {
+                    "word": word_lower,
+                    "is_valid": False,
+                    "definitions": [],
+                    "word_forms": [],
+                    "examples": [],
+                    "reason": f"Error during validation: Network error: {str(e)}"
+                }
+                
+        response_data = {
             "success": True,
-            "word": word,
-            "oxford_validation": {
-                "word": word,
-                "is_valid": is_valid,
-                "definitions": ["Test definition"] if is_valid else [],
-                "word_forms": ["noun"] if is_valid else [],
-                "examples": ["This is a test example."] if is_valid else [],
-                "reason": "Found in Oxford Dictionary" if is_valid else "Not found in Oxford Dictionary"
-            },
+            "word": word_lower,
+            "oxford_validation": validation_result,
             "message": f"Validation complete for '{word}'"
         }
+        
+        if not skip_oxford:
+            validate_cache[word_lower] = response_data
+            
+        return response_data
     
     @test_app.get("/words/search-basic")
     async def search_basic_word(word: str):
@@ -162,49 +179,53 @@ def create_test_app():
     
     @test_app.post("/words/add-validated")
     async def add_word_with_validation(request: dict):
-        word = request.get("word", "").lower()
+        word = request.get("word", "").strip()
+        if not word:
+            raise HTTPException(status_code=400, detail="Word cannot be empty")
+        if not word.isalpha():
+            raise HTTPException(status_code=400, detail="Word must contain only letters")
+            
+        word_lower = word.lower()
         skip_oxford = request.get("skip_oxford", False)
         
-        if not word or not word.isalpha():
-            return {
-                "success": False,
-                "message": "Word must contain only letters",
-                "word": word
-            }
-        
-        if word in test_words:
+        if word_lower in test_words:
             return {
                 "success": True,
-                "message": f"Word '{word}' already exists in collection",
-                "word": word
-            }
-        
-        # Mock Oxford validation if not skipped
-        if not skip_oxford:
-            is_valid = word in test_words or (len(word) > 2 and word.isalpha())
-            oxford_result = {
-                "word": word,
-                "is_valid": is_valid,
-                "definitions": ["Test definition"] if is_valid else [],
-                "word_forms": ["noun"] if is_valid else [],
-                "examples": ["This is a test example."] if is_valid else [],
-                "reason": "Found in Oxford Dictionary" if is_valid else "Not found in Oxford Dictionary"
+                "message": f"Word '{word_lower}' already exists in collection",
+                "word": word_lower
             }
             
-            if not oxford_result["is_valid"]:
+        if not skip_oxford:
+            try:
+                oxford_result = await main.oxford_validator.validate_word(word_lower)
+                if not oxford_result.get("is_valid", False):
+                    return {
+                        "success": False,
+                        "message": f"Word '{word_lower}' not found in Oxford Dictionary: {oxford_result.get('reason', '')}",
+                        "word": word_lower
+                    }
+            except Exception as e:
                 return {
                     "success": False,
-                    "message": f"Word '{word}' not found in Oxford Dictionary: {oxford_result['reason']}",
-                    "word": word
+                    "message": f"Word '{word_lower}' not found in Oxford Dictionary: Network error: {str(e)}",
+                    "word": word_lower
                 }
         
-        # Add to test words (simulate adding to collection)
-        test_words.append(word)
+        # Add to test words
+        test_words.append(word_lower)
+        
+        # Write to words.txt if in a temp directory
+        if os.path.exists("words.txt"):
+            try:
+                with open("words.txt", "a") as f:
+                    f.write(f"\n{word_lower}")
+            except Exception:
+                pass
         
         return {
             "success": True,
-            "message": f"Word '{word}' added successfully",
-            "word": word
+            "message": f"Word '{word_lower}' added successfully",
+            "word": word_lower
         }
     
     # Add missing endpoints
@@ -285,7 +306,7 @@ def test_app():
     """Create test app instance"""
     return create_test_app()
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def async_client(test_app) -> AsyncGenerator[AsyncClient, None]:
     """Create async HTTP client for testing"""
     async with AsyncClient(app=test_app, base_url="http://test") as client:

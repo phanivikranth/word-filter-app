@@ -1,0 +1,3 @@
+# Cloudflare Pages Redirect Rules
+# SPA catch-all: serves index.html for all non-file routes (Angular client-side routing)
+/* /index.html 200

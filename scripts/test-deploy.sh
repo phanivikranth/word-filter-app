@@ -32,8 +32,7 @@ show_options() {
     echo "Choose your testing method:"
     echo "1. Docker Compose (Simplest - no Kubernetes)"
     echo "2. Kind (Local Kubernetes)"
-    echo "3. AWS EKS Minimal (Cloud testing - ~$30-50/month)"
-    echo "4. Development servers (No containers)"
+    echo "3. Development servers (No containers)"
     echo ""
 }
 
@@ -128,75 +127,7 @@ kind_test() {
     echo "  kind delete cluster --name word-filter-test"
 }
 
-aws_minimal_test() {
-    log_warning "AWS EKS Minimal will create real AWS resources and cost money!"
-    log_warning "Estimated cost: $30-50/month"
-    read -p "Continue? (y/N): " -r
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        log_info "Cancelled"
-        exit 0
-    fi
-    
-    log_info "Setting up minimal EKS cluster..."
-    
-    # Check prerequisites
-    if ! command -v terraform &> /dev/null; then
-        log_error "Terraform is not installed"
-        exit 1
-    fi
-    
-    if ! command -v aws &> /dev/null; then
-        log_error "AWS CLI is not installed"
-        exit 1
-    fi
-    
-    # Deploy infrastructure
-    cd terraform-minimal/
-    terraform init
-    terraform plan
-    terraform apply -auto-approve
-    
-    # Update kubeconfig
-    CLUSTER_NAME=$(terraform output -raw cluster_name)
-    aws eks update-kubeconfig --region us-west-2 --name $CLUSTER_NAME
-    
-    # Get ECR URLs
-    ECR_BACKEND=$(terraform output -raw ecr_backend_repository_url)
-    ECR_FRONTEND=$(terraform output -raw ecr_frontend_repository_url)
-    
-    cd ..
-    
-    # Build and push images
-    log_info "Building and pushing Docker images..."
-    aws ecr get-login-password --region us-west-2 | docker login --username AWS --password-stdin $(echo $ECR_BACKEND | cut -d'/' -f1)
-    
-    docker build -t $ECR_BACKEND:latest backend/
-    docker build -t $ECR_FRONTEND:latest frontend/
-    
-    docker push $ECR_BACKEND:latest
-    docker push $ECR_FRONTEND:latest
-    
-    # Update manifests
-    sed -i.bak "s|your-account.dkr.ecr.us-west-2.amazonaws.com/word-filter-backend:latest|$ECR_BACKEND:latest|g" k8s-minimal/backend-deployment.yaml
-    sed -i.bak "s|your-account.dkr.ecr.us-west-2.amazonaws.com/word-filter-frontend:latest|$ECR_FRONTEND:latest|g" k8s-minimal/frontend-deployment.yaml
-    
-    # Install nginx ingress
-    helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
-    helm install ingress-nginx ingress-nginx/ingress-nginx --namespace ingress-nginx --create-namespace --set controller.service.type=LoadBalancer
-    
-    # Deploy application
-    kubectl apply -f k8s-minimal/
-    kubectl wait --for=condition=available --timeout=600s deployment/word-filter-backend -n word-filter-test
-    kubectl wait --for=condition=available --timeout=600s deployment/word-filter-frontend -n word-filter-test
-    
-    # Get URL
-    EXTERNAL_IP=$(kubectl get ingress word-filter-ingress -n word-filter-test -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
-    
-    log_success "Application deployed to AWS EKS!"
-    log_success "URL: http://$EXTERNAL_IP"
-    log_warning "Don't forget to destroy resources when done:"
-    echo "  cd terraform-minimal/ && terraform destroy"
-}
+# AWS Minimal deployment function has been removed because AWS configuration is purged.
 
 dev_test() {
     log_info "Starting development servers (no containers)..."
@@ -227,20 +158,16 @@ case "${1:-menu}" in
     "2"|"kind"|"local")
         kind_test
         ;;
-    "3"|"aws"|"minimal")
-        aws_minimal_test
-        ;;
-    "4"|"dev"|"development")
+    "3"|"dev"|"development")
         dev_test
         ;;
     "menu"|*)
         show_options
-        read -p "Choose option (1-4): " choice
+        read -p "Choose option (1-3): " choice
         case $choice in
             1) docker_compose_test ;;
             2) kind_test ;;
-            3) aws_minimal_test ;;
-            4) dev_test ;;
+            3) dev_test ;;
             *) log_error "Invalid option" ;;
         esac
         ;;

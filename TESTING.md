@@ -65,33 +65,9 @@ kind delete cluster --name word-filter-test
 
 ---
 
-## ☁️ **Option 3: AWS EKS Minimal**
 
-**Cost:** ~$30-50/month  
-**Setup Time:** 15-20 minutes  
-**Requirements:** AWS account + terraform
 
-### Features:
-- Real cloud environment
-- 1 small EC2 instance (t3.small)
-- Spot instance pricing (cheaper)
-- Single availability zone
-- 1 replica each service
-
-### Deploy:
-```bash
-./scripts/test-deploy.sh 3
-```
-
-### **IMPORTANT:** Clean up after testing!
-```bash
-cd terraform-minimal/
-terraform destroy
-```
-
----
-
-## 🚫 **Option 4: Development Mode (No Containers)**
+## 🏠 **Option 3: Development Mode (No Containers)**
 
 **Cost:** FREE  
 **Setup Time:** 30 seconds  
@@ -99,7 +75,7 @@ terraform destroy
 
 ### Start:
 ```bash
-./scripts/test-deploy.sh 4
+./scripts/test-deploy.sh 3
 
 # Or manually:
 # Terminal 1: cd backend && ./venv/Scripts/activate && python main.py  
@@ -117,7 +93,6 @@ terraform destroy
 |--------|------|-------|------------|----------------|----------------|
 | **Docker Compose** | FREE | ⭐⭐⭐⭐⭐ | ❌ | ⭐⭐⭐ | ❌ |
 | **Kind** | FREE | ⭐⭐⭐⭐ | ✅ | ⭐⭐⭐⭐ | ❌ |
-| **AWS Minimal** | ~$40/mo | ⭐⭐⭐ | ✅ | ⭐⭐⭐⭐⭐ | ✅ |
 | **Dev Mode** | FREE | ⭐⭐⭐⭐⭐ | ❌ | ⭐⭐ | ❌ |
 
 ---
@@ -134,11 +109,6 @@ terraform destroy
 - Verify ingress routing
 - Practice kubectl commands
 
-### 3. **AWS Minimal for Cloud Testing**  
-- Test real cloud environment
-- Verify ECR integration
-- Test with external traffic
-
 ---
 
 ## 📁 **File Structure for Testing**
@@ -148,15 +118,6 @@ fullstack-app/
 ├── docker-compose.test.yml      # Docker Compose setup
 ├── nginx-local.conf             # Local nginx config
 ├── kind-config.yaml             # Kind cluster config
-├── k8s-minimal/                 # Minimal Kubernetes manifests
-│   ├── namespace.yaml           #   (1 replica each)
-│   ├── backend-deployment.yaml  
-│   ├── frontend-deployment.yaml
-│   └── ingress.yaml
-├── terraform-minimal/           # Minimal AWS infrastructure
-│   ├── main.tf                  #   (single t3.small spot instance)
-│   ├── variables.tf
-│   └── outputs.tf
 └── scripts/
     └── test-deploy.sh           # Automated deployment script
 ```
@@ -174,10 +135,6 @@ fullstack-app/
 - **RAM**: 2GB total  
 - **CPU**: 1-2 cores
 - **Storage**: ~1GB
-
-### AWS Minimal:
-- **Instance**: t3.small (2 vCPU, 2GB RAM)
-- **Cost**: $0.0208/hour (~$15/month) + EKS control plane ($73/month)
 
 ---
 
@@ -203,15 +160,6 @@ kubectl logs deployment/word-filter-backend -n word-filter-test
 
 # Debug ingress
 kubectl describe ingress word-filter-ingress -n word-filter-test
-```
-
-### AWS Issues:
-```bash
-# Check node status
-kubectl get nodes
-
-# Check if images pulled successfully
-kubectl describe pod [POD_NAME] -n word-filter-test
 ```
 
 ---
@@ -242,7 +190,6 @@ curl "http://localhost/words/interactive?length=5&pattern=?A???"
 2. **Test Incrementally**: One feature at a time
 3. **Use Logs**: Check container/pod logs for issues
 4. **Monitor Resources**: Watch CPU/memory usage
-5. **Clean Up**: Always destroy AWS resources after testing
 
 ---
 

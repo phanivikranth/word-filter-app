@@ -144,7 +144,9 @@ class SynonymService:
         self, 
         word: str, 
         oxford_data: Optional[Dict] = None,
-        max_results: int = 15
+        max_results: int = 15,
+        *,
+        use_merriam: bool = True,
     ) -> Dict[str, any]:
         """
         Get synonyms from all available sources and combine them
@@ -168,20 +170,22 @@ class SynonymService:
         
         print(f"[DEBUG] Fetching from all sources...")
         
-        # Fetch from all sources concurrently
-        tasks = [
-            self.get_synonyms_datamuse(word, max_results),
-            self.get_synonyms_merriam_webster(word, max_results)
-        ]
+        # Fetch from available sources (DataMuse is free; Merriam-Webster uses daily quota)
+        tasks = [self.get_synonyms_datamuse(word, max_results)]
+        if use_merriam and self.merriam_webster_key:
+            tasks.append(self.get_synonyms_merriam_webster(word, max_results))
         
         results = await asyncio.gather(*tasks, return_exceptions=True)
         
         print(f"[DEBUG] Results received: {len(results)} sources")
         print(f"[DEBUG] Result 0 (DataMuse): {results[0] if not isinstance(results[0], Exception) else f'Exception: {results[0]}'}")
-        print(f"[DEBUG] Result 1 (Merriam): {results[1] if not isinstance(results[1], Exception) else f'Exception: {results[1]}'}")
+        if len(results) > 1:
+            print(f"[DEBUG] Result 1 (Merriam): {results[1] if not isinstance(results[1], Exception) else f'Exception: {results[1]}'}")
         
         datamuse_synonyms = results[0] if not isinstance(results[0], Exception) else []
-        merriam_synonyms = results[1] if not isinstance(results[1], Exception) else []
+        merriam_synonyms = (
+            results[1] if len(results) > 1 and not isinstance(results[1], Exception) else []
+        )
         oxford_synonyms = self.get_synonyms_oxford(oxford_data) if oxford_data else []
         
         print(f"[DEBUG] DataMuse: {len(datamuse_synonyms)} synonyms")

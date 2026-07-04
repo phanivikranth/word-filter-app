@@ -8,16 +8,17 @@ services:
     container_name: word-filter-backend
     restart: unless-stopped
     ports:
-      - "8001:8001"
+      - "8000:8000"
     environment:
       - ENVIRONMENT=production
       - LOG_LEVEL=INFO
+      - PORT=8000
       - CORS_ORIGINS=http://localhost,http://localhost:80,http://localhost:4201
     volumes:
       - ./backend/words.txt:/app/words.txt:ro
       - backend-logs:/app/logs
     healthcheck:
-      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8001/words/stats')"]
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/words/stats')"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -37,7 +38,7 @@ services:
       backend:
         condition: service_healthy
     environment:
-      - BACKEND_URL=http://backend:8001
+      - BACKEND_URL=http://backend:8000
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/"]
       interval: 30s

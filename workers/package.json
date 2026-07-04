@@ -1,0 +1,26 @@
+{
+  "name": "word-filter-api-gateway",
+  "version": "1.0.0",
+  "description": "Cloudflare Workers API Gateway for Word Filter App",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy --env production",
+    "deploy-staging": "wrangler deploy --env staging",
+    "format": "prettier --write 'src/**/*.ts'",
+    "lint": "eslint src/**/*.ts",
+    "type-check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240605.1",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "eslint": "^8.56.0",
+    "prettier": "^3.2.5",
+    "typescript": "^5.3.3",
+    "wrangler": "^3.28.4"
+  },
+  "dependencies": {
+    "itty-router": "^4.0.0"
+  }
+}

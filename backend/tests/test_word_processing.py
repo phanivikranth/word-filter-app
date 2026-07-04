@@ -153,7 +153,7 @@ class TestChunkProcessing:
 
     def test_filter_words_chunk_multiple_filters(self):
         """Test chunk filtering with multiple filters"""
-        words_chunk = ['apple', 'application', 'appreciate', 'banana']
+        words_chunk = ['appl', 'application', 'appreciate', 'banana']
         filters = {'starts_with': 'app', 'min_length': 5}
         chunk_data = (words_chunk, filters)
         

@@ -13,12 +13,11 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Copy application code
 COPY . .
 
-# Expose the port
-EXPOSE 8001
+ENV PORT=8000
+EXPOSE 8000
 
-# Health check
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:8001/')" || exit 1
+    CMD python -c "import os,requests; requests.get(f'http://localhost:{os.environ.get(\"PORT\",8000)}/health')" || exit 1
 
 # Run the application
 CMD ["python", "main.py"]

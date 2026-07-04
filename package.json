@@ -7,6 +7,7 @@
     "setup": "cd backend && python -m venv venv && venv\\Scripts\\activate && pip install -r requirements.txt && cd ../frontend && npm install",
     "start-backend": "cd backend && venv\\Scripts\\activate && python main.py",
     "start-frontend": "cd frontend && npm start",
+    "build": "npm install --prefix frontend && npm run build --prefix frontend",
     "dev": "echo 'Run npm run start-backend and npm run start-frontend in separate terminals'"
   },
   "keywords": [

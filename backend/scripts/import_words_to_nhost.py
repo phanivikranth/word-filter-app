@@ -10,15 +10,18 @@ JSON format:
 
 Usage:
   cd backend
-  venv\\Scripts\\python.exe scripts\\import_words_to_nhost.py --file path\\to\\words.json
+  venv\\Scripts\\python.exe scripts\\import_words_to_nhost.py --file data\\sample_words_definitions.json
   venv\\Scripts\\python.exe scripts\\import_words_to_nhost.py --file words.json --ensure-schema
 """
 
 from __future__ import annotations
 
 import argparse
+import json
+import logging
 import os
 import sys
+from datetime import datetime
 from pathlib import Path
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
@@ -32,13 +35,72 @@ load_dotenv()
 
 from nhost_service import NhostWordService  # noqa: E402
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+)
+logger = logging.getLogger("import_words_to_nhost")
+
+
+def print_report(
+    *,
+    file_path: Path,
+    before: dict,
+    after: dict,
+    import_report: dict,
+) -> None:
+    width = 62
+    print("\n" + "=" * width)
+    print("NHOST DEFINITIONS IMPORT SUMMARY")
+    print("=" * width)
+    print(f"Source file:        {file_path}")
+    print(f"Completed at:       {datetime.now().isoformat(timespec='seconds')}")
+    print("-" * width)
+    print("FILE")
+    print(f"  Entries in JSON:           {import_report['file_entries']:>10,}")
+    print(f"  Processed (valid keys):    {import_report['processed']:>10,}")
+    print(f"  With definitions:          {import_report['file_with_definitions']:>10,}")
+    print(f"  Empty definitions in file: {import_report['file_empty_definitions']:>10,}")
+    print("-" * width)
+    print("DATABASE CHANGES (this run)")
+    print(f"  New rows inserted:         {import_report['rows_inserted']:>10,}")
+    print(f"  Existing rows updated:     {import_report['rows_updated']:>10,}")
+    print(f"  Failed to upsert:          {import_report['failed_count']:>10,}")
+    print(f"  Transport:                 {import_report.get('via', 'unknown'):>10}")
+    print("-" * width)
+    print("DATABASE TOTALS")
+    print(f"  Before — total rows:       {before['total']:>10,}")
+    print(f"  Before — with definitions: {before['with_definitions']:>10,}")
+    print(f"  Before — empty definitions:{before['empty_definitions']:>10,}")
+    print(f"  After  — total rows:       {after['total']:>10,}")
+    print(f"  After  — with definitions: {after['with_definitions']:>10,}")
+    print(f"  After  — empty definitions:{after['empty_definitions']:>10,}")
+    print(f"  Net new rows:              {after['total'] - before['total']:>10,}")
+    print(
+        f"  Definitions added in DB:   "
+        f"{after['with_definitions'] - before['with_definitions']:>10,}"
+    )
+    print("=" * width)
+
+    if import_report["failed_count"]:
+        print("\nFAILED WORDS (could not insert/update):")
+        for item in import_report["failed_words"][:50]:
+            print(f"  - {item['word']}: {item['error']}")
+        if import_report["failed_count"] > 50:
+            print(f"  ... and {import_report['failed_count'] - 50} more")
+        fail_log = BACKEND_DIR / "logs" / "nhost_import_failures.json"
+        fail_log.parent.mkdir(parents=True, exist_ok=True)
+        with open(fail_log, "w", encoding="utf-8") as file:
+            json.dump(import_report["failed_words"], file, indent=2)
+        print(f"\nFull failure list written to: {fail_log}")
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Import word JSON into Nhost database")
     parser.add_argument(
         "--file",
         "-f",
-        required=True,
+        default="data/sample_words_definitions.json",
         help="Path to JSON file ({word: definition, ...})",
     )
     parser.add_argument(
@@ -63,50 +125,71 @@ def main() -> int:
     if not file_path.is_absolute():
         file_path = (BACKEND_DIR / file_path).resolve()
     if not file_path.exists():
-        print(f"File not found: {file_path}", file=sys.stderr)
+        logger.error("File not found: %s", file_path)
         return 1
 
     service = NhostWordService()
     status = service.get_status()
-    print("Nhost status:", status)
+    logger.info("Nhost status: %s", status)
+
+    logger.info("Loading JSON from %s ...", file_path)
+    words = service.load_json_file(str(file_path))
+    with_defs = sum(1 for d in words.values() if str(d).strip())
+    empty = len(words) - with_defs
+    logger.info(
+        "Parsed %s entries (%s with definitions, %s empty)",
+        f"{len(words):,}",
+        f"{with_defs:,}",
+        f"{empty:,}",
+    )
 
     if args.dry_run:
-        words = service.load_json_file(str(file_path))
-        print(f"Dry run: would import {len(words):,} words from {file_path}")
-        sample = list(words.items())[:3]
-        for word, definition in sample:
+        print(f"Dry run: would upsert {len(words):,} words from {file_path}")
+        for word, definition in list(words.items())[:3]:
             preview = definition[:80] + ("..." if len(definition) > 80 else "")
             print(f"  - {word}: {preview}")
         return 0
 
     if not service.is_configured():
-        print(
-            "Nhost is not configured. Set in backend/.env:\n"
-            "  USE_NHOST=true\n"
-            "  NHOST_SUBDOMAIN=your-subdomain\n"
-            "  NHOST_REGION=us-east-1\n"
-            "  NHOST_DATABASE_URL=postgres://...\n"
-            "  NHOST_ADMIN_SECRET=your-admin-secret (optional if using DATABASE_URL)\n",
-            file=sys.stderr,
+        logger.error(
+            "Nhost is not configured. Set USE_NHOST=true and NHOST_DATABASE_URL in backend/.env"
         )
         return 1
 
     if args.ensure_schema:
         if not status["has_database_url"]:
-            print("--ensure-schema requires NHOST_DATABASE_URL", file=sys.stderr)
+            logger.error("--ensure-schema requires NHOST_DATABASE_URL")
             return 1
         service.ensure_schema()
-        print("Schema checked/created.")
+        logger.info("Schema checked/created.")
 
-    words = service.load_json_file(str(file_path))
-    print(f"Importing {len(words):,} words from {file_path} ...")
-    result = service.bulk_upsert_words(words, batch_size=args.batch_size)
-    print(
-        f"Done. total={result['total']:,} "
-        f"inserted~={result.get('inserted', 0):,} "
-        f"updated~={result.get('updated', 0):,}"
+    before = {"total": 0, "empty_definitions": 0, "with_definitions": 0}
+    if status["has_database_url"]:
+        before = service.get_table_stats()
+        logger.info(
+            "Before import — total: %s, with definitions: %s, empty: %s",
+            f"{before['total']:,}",
+            f"{before['with_definitions']:,}",
+            f"{before['empty_definitions']:,}",
+        )
+
+    logger.info("Upserting definitions (batch size %s) ...", args.batch_size)
+    import_report = service.bulk_upsert_words_with_report(
+        words, batch_size=args.batch_size
     )
-    return 0
+
+    after = before
+    if status["has_database_url"]:
+        after = service.get_table_stats()
+
+    print_report(
+        file_path=file_path,
+        before=before,
+        after=after,
+        import_report=import_report,
+    )
+
+    return 1 if import_report["failed_count"] else 0
 
 
 if __name__ == "__main__":

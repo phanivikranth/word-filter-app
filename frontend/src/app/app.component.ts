@@ -60,6 +60,9 @@ export class AppComponent implements OnInit, OnDestroy {
   puzzleRegex = '';
   puzzleAnagram = '';
   puzzleAnagramExact = false;
+  puzzleMeansLike = '';
+  puzzleSoundsLike = '';
+  puzzleSpelledLike = '';
   letterBoxes: string[] = [];
   interactiveWords: string[] = [];
   interactiveLoading = false;
@@ -121,6 +124,11 @@ export class AppComponent implements OnInit, OnDestroy {
   puzzleGuess = '';
   puzzleChecked = false;
   puzzleSuccess = false;
+  dailyScrambleLetters: string[] = [];
+  dailyScrambleHint = '';
+  dailyScrambleWord = '';
+  dailyScrambleLoading = false;
+  dailyScrambleError = '';
 
   // Weekly Word Section
   weeklyWords = [
@@ -129,6 +137,11 @@ export class AppComponent implements OnInit, OnDestroy {
     { word: 'resilient', definition: 'able to withstand or recover quickly from difficult conditions.', icon: 'school' },
     { word: 'ephemeral', definition: 'lasting for a very short time.', icon: 'local_library' }
   ];
+
+  dailySafeWord = '';
+  dailySafeWordDefinition = '';
+  dailySafeWordLoading = false;
+  dailySafeWordError = '';
   
   /** Subscription management */
   private statsIntervalSubscription: Subscription | null = null;
@@ -182,7 +195,9 @@ export class AppComponent implements OnInit, OnDestroy {
 
     this.loadWordStats();
     this.searchWords(); 
-    this.onPuzzleLengthChange(); 
+    this.onPuzzleLengthChange();
+    this.loadDailySafeWord();
+    this.loadDailyScramble();
 
     // Setup periodic metrics update and simulated edge worker logs
     this.statsIntervalSubscription = interval(10000).subscribe(() => {
@@ -206,9 +221,94 @@ export class AppComponent implements OnInit, OnDestroy {
     }
   }
 
+  loadDailySafeWord(): void {
+    const today = new Date().toISOString().slice(0, 10);
+    const cachedDate = localStorage.getItem('dailySafeWordDate');
+    const cachedDefinition = localStorage.getItem('dailySafeWordDefinition');
+    const cachedWord = localStorage.getItem('dailySafeWord');
+
+    if (cachedDate === today && cachedDefinition && cachedWord) {
+      this.dailySafeWord = cachedWord;
+      this.dailySafeWordDefinition = cachedDefinition;
+      return;
+    }
+
+    this.dailySafeWordLoading = true;
+    this.dailySafeWordError = '';
+    this.wordService.getDailySafeWord().subscribe({
+      next: (res) => {
+        this.dailySafeWordLoading = false;
+        if (res.success && res.definition && res.word) {
+          this.dailySafeWord = res.word;
+          this.dailySafeWordDefinition = res.definition;
+          localStorage.setItem('dailySafeWordDate', today);
+          localStorage.setItem('dailySafeWord', res.word);
+          localStorage.setItem('dailySafeWordDefinition', res.definition);
+        } else {
+          this.dailySafeWordError = 'Could not load today\'s word.';
+        }
+      },
+      error: () => {
+        this.dailySafeWordLoading = false;
+        this.dailySafeWordError = 'Words API unavailable. Add your RapidAPI key to enable Daily Safe Word.';
+      }
+    });
+  }
+
   // ==========================================
   // VIEW MODE CHANGERS
   // ==========================================
+
+  loadDailyScramble(): void {
+    const today = new Date().toISOString().slice(0, 10);
+    const cachedDate = localStorage.getItem('dailyScrambleDate');
+    const cachedWord = localStorage.getItem('dailyScrambleWord');
+    const cachedScrambled = localStorage.getItem('dailyScrambleScrambled');
+    const cachedHint = localStorage.getItem('dailyScrambleHint');
+
+    if (cachedDate === today && cachedWord && cachedScrambled) {
+      this.dailyScrambleWord = cachedWord;
+      this.dailyScrambleLetters = cachedScrambled.toUpperCase().split('');
+      this.dailyScrambleHint = cachedHint || '';
+      return;
+    }
+
+    this.dailyScrambleLoading = true;
+    this.dailyScrambleError = '';
+    this.wordService.getDailyScramble().subscribe({
+      next: (res) => {
+        this.dailyScrambleLoading = false;
+        if (res.success && res.word && res.scrambled) {
+          this.dailyScrambleWord = res.word.toLowerCase();
+          this.dailyScrambleLetters = res.scrambled.toUpperCase().split('');
+          this.dailyScrambleHint = res.hint || '';
+          localStorage.setItem('dailyScrambleDate', today);
+          localStorage.setItem('dailyScrambleWord', this.dailyScrambleWord);
+          localStorage.setItem('dailyScrambleScrambled', res.scrambled);
+          localStorage.setItem('dailyScrambleHint', this.dailyScrambleHint);
+        } else {
+          this.dailyScrambleError = 'Could not load today\'s puzzle.';
+        }
+      },
+      error: (err) => {
+        this.dailyScrambleLoading = false;
+        const status = err?.status;
+        const detail = err?.error?.detail;
+        if (status === 404) {
+          this.dailyScrambleError =
+            'Daily puzzle endpoint not found. Restart the backend to load the latest code.';
+        } else if (status === 503 && detail) {
+          this.dailyScrambleError = String(detail);
+        } else if (status === 0) {
+          this.dailyScrambleError =
+            'Cannot reach the backend. Start it on port 8000 and refresh.';
+        } else {
+          this.dailyScrambleError =
+            detail || 'Daily puzzle unavailable. Check that the backend is running.';
+        }
+      }
+    });
+  }
 
   setSearchMode(mode: 'basic' | 'advanced' | 'puzzle' | 'games' | 'admin' | 'performance' | 'profile') {
     this.searchMode = mode;
@@ -259,10 +359,17 @@ export class AppComponent implements OnInit, OnDestroy {
       next: (result) => {
         this.searchResult = result;
         this.isSearching = false;
+        if (result.lookupFailed && !result.oxford) {
+          this.searchError =
+            'Dictionary lookup failed. The backend could not reach the database — trying live sources may still work after a refresh.';
+          this.showNotification(this.searchError, 'error');
+          return;
+        }
         if (result.oxford || result.inCollection) {
           this.showNotification(`Found details for "${result.word}"!`, 'success');
         } else {
-          this.showNotification(`No Oxford details found for "${result.word}".`, 'info');
+          this.searchError = `No dictionary entry found for "${result.word}".`;
+          this.showNotification(this.searchError, 'info');
         }
       },
       error: (error) => {
@@ -366,55 +473,40 @@ export class AppComponent implements OnInit, OnDestroy {
     this.interactiveWords = [];
 
     const patternString = this.letterBoxes.map(letter => letter || '?').join('');
-    
-    // Check if we can use getInteractiveWords (only pattern, no regex, no anagram, and pattern has no @ or #)
-    const isStandardPatternOnly = !this.puzzleRegex && !this.puzzleAnagram && !patternString.includes('@') && !patternString.includes('#');
+    const useDatamuse = Boolean(
+      this.puzzleMeansLike || this.puzzleSoundsLike || this.puzzleSpelledLike
+    );
+    const datamuseSp = this.puzzleSpelledLike
+      || ((!patternString.includes('@') && !patternString.includes('#')) ? patternString : undefined);
 
-    if (isStandardPatternOnly) {
-      this.wordService.getInteractiveWords(this.puzzleLength, patternString).subscribe({
-        next: (words) => {
-          this.interactiveWords = words;
-          this.interactiveLoading = false;
-          if (words.length === 0) {
-            this.interactiveError = 'No words found matching your pattern.';
-            this.showNotification('No matching words found.', 'info');
-          } else {
-            this.showNotification(`Found ${words.length} matching words!`, 'success');
-          }
-        },
-        error: (error) => {
-          console.error('Error finding interactive words:', error);
-          this.interactiveError = 'Failed to find words. Make sure the backend is running.';
-          this.interactiveLoading = false;
-          this.showNotification('Error loading matches. Check backend connection.', 'error');
+    this.wordService.getPuzzleWords({
+      pattern: patternString,
+      regex: this.puzzleRegex || undefined,
+      anagram: this.puzzleAnagram || undefined,
+      anagram_exact: this.puzzleAnagram ? this.puzzleAnagramExact : undefined,
+      sp: datamuseSp || undefined,
+      ml: this.puzzleMeansLike || undefined,
+      sl: this.puzzleSoundsLike || undefined,
+      include_datamuse: useDatamuse || Boolean(datamuseSp),
+      limit: 200
+    }).subscribe({
+      next: (words) => {
+        this.interactiveWords = words;
+        this.interactiveLoading = false;
+        if (words.length === 0) {
+          this.interactiveError = 'No words found matching your pattern.';
+          this.showNotification('No matching words found.', 'info');
+        } else {
+          this.showNotification(`Found ${words.length} matching words!`, 'success');
         }
-      });
-    } else {
-      this.wordService.getPuzzleWords({
-        pattern: patternString,
-        regex: this.puzzleRegex || undefined,
-        anagram: this.puzzleAnagram || undefined,
-        anagram_exact: this.puzzleAnagram ? this.puzzleAnagramExact : undefined,
-        limit: 200
-      }).subscribe({
-        next: (words) => {
-          this.interactiveWords = words;
-          this.interactiveLoading = false;
-          if (words.length === 0) {
-            this.interactiveError = 'No words found matching your pattern.';
-            this.showNotification('No matching words found.', 'info');
-          } else {
-            this.showNotification(`Found ${words.length} matching words!`, 'success');
-          }
-        },
-        error: (error) => {
-          console.error('Error finding puzzle words:', error);
-          this.interactiveError = 'Failed to find words. Make sure the backend is running.';
-          this.interactiveLoading = false;
-          this.showNotification('Error loading matches. Check backend connection.', 'error');
-        }
-      });
-    }
+      },
+      error: (error) => {
+        console.error('Error finding puzzle words:', error);
+        this.interactiveError = 'Failed to find words. Make sure the backend is running.';
+        this.interactiveLoading = false;
+        this.showNotification('Error loading matches. Check backend connection.', 'error');
+      }
+    });
   }
 
   clearInteractive() {
@@ -426,6 +518,9 @@ export class AppComponent implements OnInit, OnDestroy {
     this.puzzleRegex = '';
     this.puzzleAnagram = '';
     this.puzzleAnagramExact = false;
+    this.puzzleMeansLike = '';
+    this.puzzleSoundsLike = '';
+    this.puzzleSpelledLike = '';
     this.interactiveLoading = false;
     this.showNotification('Puzzle filters cleared', 'info');
   }
@@ -1100,9 +1195,16 @@ export class AppComponent implements OnInit, OnDestroy {
   checkPuzzleGuess() {
     const guess = (this.puzzleGuess || '').trim().toLowerCase();
     this.puzzleChecked = true;
-    if (guess === 'terse') {
+    const answer = (this.dailyScrambleWord || '').trim().toLowerCase();
+    if (!answer) {
+      this.puzzleSuccess = false;
+      this.showNotification('Daily puzzle is still loading. Try again in a moment.', 'info');
+      return;
+    }
+    if (guess === answer) {
       this.puzzleSuccess = true;
-      this.showNotification('Correct! The word of the day is Terse.', 'success');
+      const label = answer.charAt(0).toUpperCase() + answer.slice(1);
+      this.showNotification(`Correct! The word of the day is ${label}.`, 'success');
     } else {
       this.puzzleSuccess = false;
       this.showNotification('Incorrect guess. Try again!', 'error');
@@ -1157,6 +1259,87 @@ export class AppComponent implements OnInit, OnDestroy {
     this.searchWordBasic();
     this.showNotification(`Searching for "${word}"...`, 'info');
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  getValidationSourceLabel(source?: string): string {
+    const labels: Record<string, string> = {
+      nhost: 'Cached',
+      merriam_webster: 'Merriam-Webster',
+      oxford_dictionaries_api: 'Oxford API',
+      dictionary_api_dev: 'Dictionary API',
+      freedictionary_api_com: 'Free Dictionary API',
+      words_api_rapidapi: 'Words API',
+      word_game_db: 'Word Game DB',
+      datamuse: 'DataMuse',
+      oxford_web: 'Oxford Learner\'s',
+      freedictionary: 'TheFreeDictionary',
+      freedictionary_encyclopedia: 'TheFreeDictionary',
+      skipped: 'Validation skipped',
+      none: 'No source',
+    };
+    return labels[source || ''] || (source ? source.replace(/_/g, ' ') : '');
+  }
+
+  hasDictionaryContent(oxford?: OxfordValidation | null): boolean {
+    if (!oxford) {
+      return false;
+    }
+    return Boolean(
+      oxford.definitions?.length
+      || oxford.synonyms?.length
+      || oxford.antonyms?.length
+      || oxford.rhymes?.length
+      || oxford.frequency != null
+      || oxford.pronunciations?.length
+      || oxford.examples?.length
+      || this.hasWordOrigin(oxford)
+      || this.getDictionaryLinks(oxford).length
+    );
+  }
+
+  showSummary(oxford?: OxfordValidation | null): boolean {
+    if (!oxford?.summary?.trim()) {
+      return false;
+    }
+    const summary = oxford.summary.trim();
+    const firstDef = oxford.definitions?.[0]?.trim();
+    return !firstDef || summary.toLowerCase() !== firstDef.toLowerCase();
+  }
+
+  getDictionaryLinks(oxford?: OxfordValidation | null): { key: string; url: string }[] {
+    if (!oxford) {
+      return [];
+    }
+    const links: { key: string; url: string }[] = [];
+    const seen = new Set<string>();
+    const add = (key: string, url?: string) => {
+      const value = (url || '').trim();
+      if (!value || seen.has(value)) {
+        return;
+      }
+      seen.add(value);
+      links.push({ key, url: value });
+    };
+
+    if (oxford.links) {
+      for (const [key, url] of Object.entries(oxford.links)) {
+        add(key, url);
+      }
+    }
+    add('dictionary', oxford.dictionary_url);
+    add('encyclopedia', oxford.encyclopedia_url);
+    return links;
+  }
+
+  hasWordOrigin(oxford?: OxfordValidation | null): boolean {
+    if (!oxford) {
+      return false;
+    }
+    return Boolean(
+      oxford.etymology?.trim()
+      || oxford.origin_language?.trim()
+      || oxford.first_known_use?.trim()
+    );
   }
 
   playPronunciation(audioUrl?: string, word?: string) {

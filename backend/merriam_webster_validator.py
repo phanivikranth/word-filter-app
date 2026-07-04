@@ -179,6 +179,7 @@ class MerriamWebsterValidator:
             "suggestions": [],
             "reason": reason,
             "source": "merriam_webster",
+            "source_url": f"https://www.merriam-webster.com/thesaurus/{word}",
         }
 
     async def validate_word(self, word: str, *, use_quota: bool = True) -> Dict[str, Any]:

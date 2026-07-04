@@ -16,10 +16,19 @@ from oxford_validator import OxfordValidator
 from merriam_webster_validator import MerriamWebsterValidator
 from oxford_dictionaries_api_validator import OxfordDictionariesApiValidator
 from combined_word_validator import CombinedWordValidator
+from dictionary_api_dev_service import DictionaryApiDevService
+from freedictionary_api_com_service import FreeDictionaryApiComService
+from words_api_rapidapi_service import WordsApiRapidapiService
+from word_game_db_service import WordGameDbService
+from datamuse_service import DatamuseService
+from daily_scramble_service import DailyScrambleService
 from freedictionary_service import FreeDictionaryService
-from unified_word_lookup import UnifiedWordLookup
 from synonym_service import get_synonym_service
 from word_manager import WordManager
+from dictionary_source_config import get_enrich_source_flags, get_portal_source_flags
+from unified_word_lookup import UnifiedWordLookup, WEB_UI_SOURCE_ORDER
+from word_enrichment_service import WordEnrichmentService
+from word_lookup_orchestrator import WordLookupOrchestrator
 from nhost_service import NhostWordService
 from puzzle_solver import match_pattern as advanced_match_pattern, match_regex, match_anagram
 
@@ -173,10 +182,21 @@ combined_validator = CombinedWordValidator(
     oxford_dictionaries_api_validator,
 )
 freedictionary_service = FreeDictionaryService()
+dictionary_api_dev_service = DictionaryApiDevService()
+freedictionary_api_com_service = FreeDictionaryApiComService()
+words_api_rapidapi_service = WordsApiRapidapiService()
+word_game_db_service = WordGameDbService()
+datamuse_service = DatamuseService()
+daily_scramble_service = DailyScrambleService()
 unified_lookup = UnifiedWordLookup(
     oxford_validator,
     merriam_webster_validator,
     oxford_dictionaries_api_validator,
+    dictionary_api_dev_service,
+    freedictionary_api_com_service,
+    words_api_rapidapi_service,
+    word_game_db_service,
+    datamuse_service,
     freedictionary_service,
 )
 
@@ -192,6 +212,27 @@ process_pool = ProcessPoolExecutor(max_workers=2)
 # Initialize synonym service
 MERRIAM_WEBSTER_KEY = os.getenv('MERRIAM_WEBSTER_API_KEY')
 synonym_service = get_synonym_service(MERRIAM_WEBSTER_KEY)
+
+async def _enrich_synonyms(
+    word: str, oxford_data: dict, *, use_merriam: bool = True
+) -> dict:
+    return await synonym_service.get_synonyms_combined(
+        word, oxford_data, max_results=15, use_merriam=use_merriam
+    )
+
+word_enrichment_service = WordEnrichmentService(
+    unified_lookup,
+    synonym_enricher=_enrich_synonyms,
+    use_merriam_for_synonyms=(
+        os.getenv("UI_USE_MERRIAM_FOR_SYNONYMS", "false").lower() == "true"
+    ),
+)
+
+word_lookup_orchestrator = WordLookupOrchestrator(
+    word_enrichment_service,
+    nhost_service,
+    synonym_enricher=_enrich_synonyms,
+)
 
 @monitor_async_performance("load_words_concurrent")
 async def load_words_concurrent():
@@ -524,21 +565,68 @@ async def get_puzzle_words(
     regex: Optional[str] = Query(None, description="Regular expression pattern to match"),
     anagram: Optional[str] = Query(None, description="Letters to match anagrams from"),
     anagram_exact: bool = Query(False, description="Whether to require exact anagram match"),
-    limit: int = Query(100, ge=1, le=1000, description="Max results to return")
+    limit: int = Query(100, ge=1, le=1000, description="Max results to return"),
+    sp: Optional[str] = Query(None, description="DataMuse spelled-like pattern (e.g. ???? for 4-letter words)"),
+    ml: Optional[str] = Query(None, description="DataMuse means-like query"),
+    sl: Optional[str] = Query(None, description="DataMuse sounds-like query"),
+    rel_syn: Optional[str] = Query(None, description="DataMuse related synonym"),
+    rel_trg: Optional[str] = Query(None, description="DataMuse related trigger word"),
+    rel_jja: Optional[str] = Query(None, description="DataMuse adjective modifier of noun"),
+    rel_jjb: Optional[str] = Query(None, description="DataMuse adjective described by noun"),
+    include_datamuse: bool = Query(True, description="Merge DataMuse results when query params are provided"),
 ):
-    """Find words matching advanced puzzle filters (wildcards, regex, and anagrams)"""
-    candidates = words_list
-    
+    """Find words matching advanced puzzle filters (wildcards, regex, anagrams, and DataMuse)."""
+    candidates = list(words_list)
+    datamuse_words: List[str] = []
+
+    dm_params: dict = {}
+    if sp:
+        dm_params["sp"] = sp
+    if ml:
+        dm_params["ml"] = ml
+    if sl:
+        dm_params["sl"] = sl
+    if rel_syn:
+        dm_params["rel_syn"] = rel_syn
+    if rel_trg:
+        dm_params["rel_trg"] = rel_trg
+    if rel_jja:
+        dm_params["rel_jja"] = rel_jja
+    if rel_jjb:
+        dm_params["rel_jjb"] = rel_jjb
+
+    if dm_params and include_datamuse and datamuse_service.is_configured():
+        dm_params["max"] = min(limit * 2, 1000)
+        datamuse_words = await datamuse_service.find_words_for_puzzle(**dm_params)
+
     if anagram:
         candidates = [w for w in candidates if match_anagram(w, anagram, exact=anagram_exact)]
-        
+        if datamuse_words:
+            datamuse_words = [
+                w for w in datamuse_words if match_anagram(w, anagram, exact=anagram_exact)
+            ]
+
     if pattern:
         candidates = [w for w in candidates if advanced_match_pattern(w, pattern)]
-        
+        if datamuse_words and not sp:
+            datamuse_words = [
+                w for w in datamuse_words if advanced_match_pattern(w, pattern)
+            ]
+
     if regex:
         candidates = [w for w in candidates if match_regex(w, regex)]
-        
-    return candidates[:limit]
+        if datamuse_words:
+            datamuse_words = [w for w in datamuse_words if match_regex(w, regex)]
+
+    merged: List[str] = []
+    seen: set = set()
+    for word in candidates + datamuse_words:
+        key = word.lower()
+        if key not in seen:
+            seen.add(key)
+            merged.append(key)
+
+    return merged[:limit]
 
 @app.get("/words/random")
 async def get_random_word(
@@ -586,9 +674,6 @@ async def get_performance_stats():
 
 # OXFORD DICTIONARY & SYNONYM ENDPOINTS
 
-async def _enrich_synonyms(word: str, oxford_data: dict) -> dict:
-    return await synonym_service.get_synonyms_combined(word, oxford_data, max_results=15)
-
 @app.post("/words/validate")
 async def validate_word(request: ValidateWordRequest):
     """Unified word lookup across all dictionary sources (UI-stable response)."""
@@ -612,21 +697,8 @@ async def validate_word(request: ValidateWordRequest):
                 "validation_source": "skipped",
             })
         else:
-            if nhost_service.is_configured() and nhost_service.use_cache_on_lookup:
-                cached = await nhost_service.lookup_word(word.lower())
-                if cached and cached.get("definitions"):
-                    lookup_result = cached
-                    validation_result = unified_lookup.to_ui_validation(cached)
-                else:
-                    lookup_result = await unified_lookup.lookup_word(
-                        word, enrich_synonyms=_enrich_synonyms
-                    )
-                    validation_result = unified_lookup.to_ui_validation(lookup_result)
-            else:
-                lookup_result = await unified_lookup.lookup_word(
-                    word, enrich_synonyms=_enrich_synonyms
-                )
-                validation_result = unified_lookup.to_ui_validation(lookup_result)
+            lookup_result = await word_lookup_orchestrator.lookup_for_ui(word)
+            validation_result = unified_lookup.to_ui_validation(lookup_result)
 
             if lookup_result.get("synonym_sources"):
                 validation_result["synonym_sources"] = lookup_result["synonym_sources"]
@@ -666,9 +738,7 @@ async def search_basic_word(word: str):
             raise HTTPException(status_code=400, detail="Word must contain only letters")
 
         in_collection = word_lower in words_set
-        lookup_result = await unified_lookup.lookup_word(
-            word_lower, enrich_synonyms=_enrich_synonyms
-        )
+        lookup_result = await word_lookup_orchestrator.lookup_for_ui(word_lower)
         ui_result = unified_lookup.to_ui_validation(lookup_result)
 
         # Always return a stable object so the UI never breaks on null.
@@ -950,6 +1020,10 @@ async def get_storage_info():
             "success": True,
             "storage_info": storage_info,
             "nhost": nhost_service.get_status(),
+            "dictionary_sources": {
+                "portal": get_portal_source_flags().as_dict(),
+                "enrich": get_enrich_source_flags().as_dict(),
+            },
         }
     except Exception as e:
         logger.error(f"Error getting storage info: {e}")
@@ -1045,6 +1119,143 @@ async def get_dictionary_statistics():
         logger.error(f"Error getting dictionary stats: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
+@app.get("/word-game-db/categories")
+async def word_game_db_categories():
+    """Word Game DB: list categories."""
+    if not word_game_db_service.is_configured():
+        raise HTTPException(status_code=503, detail="Word Game DB is disabled")
+    payload = await word_game_db_service.get_categories()
+    if not payload.get("ok"):
+        raise HTTPException(
+            status_code=payload.get("status") or 502,
+            detail=payload.get("error") or "Word Game DB categories failed",
+        )
+    return {"success": True, "categories": payload["data"]}
+
+@app.get("/word-game-db/random")
+async def word_game_db_random():
+    """Word Game DB: random word."""
+    if not word_game_db_service.is_configured():
+        raise HTTPException(status_code=503, detail="Word Game DB is disabled")
+    payload = await word_game_db_service.get_random_word()
+    if not payload.get("ok"):
+        raise HTTPException(
+            status_code=payload.get("status") or 502,
+            detail=payload.get("error") or "Word Game DB random failed",
+        )
+    data = payload["data"]
+    word = str((data or {}).get("word") or "").strip().lower()
+    hint = str((data or {}).get("hint") or "").strip()
+    return {
+        "success": True,
+        "word": word,
+        "definition": hint,
+        "data": data,
+    }
+
+@app.get("/word-game-db/words")
+async def word_game_db_words(
+    min_letters: Optional[int] = Query(None, alias="minLetters"),
+    max_letters: Optional[int] = Query(None, alias="maxLetters"),
+    min_syllables: Optional[int] = Query(None, alias="minSyllables"),
+    max_syllables: Optional[int] = Query(None, alias="maxSyllables"),
+    limit: Optional[int] = Query(10, ge=1, le=100),
+    offset: Optional[int] = Query(0, ge=0),
+    category: Optional[str] = None,
+):
+    """Word Game DB: filtered word list with pagination."""
+    if not word_game_db_service.is_configured():
+        raise HTTPException(status_code=503, detail="Word Game DB is disabled")
+    payload = await word_game_db_service.list_words(
+        min_letters=min_letters,
+        max_letters=max_letters,
+        min_syllables=min_syllables,
+        max_syllables=max_syllables,
+        limit=limit,
+        offset=offset,
+        category=category,
+    )
+    if not payload.get("ok"):
+        raise HTTPException(
+            status_code=payload.get("status") or 502,
+            detail=payload.get("error") or "Word Game DB words query failed",
+        )
+    return {"success": True, **payload["data"]}
+
+@app.get("/words-api/search")
+async def words_api_search(
+    letter_pattern: str = Query(..., alias="letterPattern"),
+):
+    """Words API (RapidAPI): search by letter pattern, e.g. ^a.{4}$"""
+    if not words_api_rapidapi_service.is_configured():
+        raise HTTPException(
+            status_code=503,
+            detail="Words API (RapidAPI) is not configured (WORDS_API_RAPIDAPI_KEY)",
+        )
+    payload = await words_api_rapidapi_service.search_words(
+        letter_pattern=letter_pattern
+    )
+    if not payload.get("ok"):
+        raise HTTPException(
+            status_code=payload.get("status") or 502,
+            detail=payload.get("error") or "Words API search failed",
+        )
+    return {"success": True, "letterPattern": letter_pattern, "data": payload["data"]}
+
+@app.get("/words-api/random")
+async def words_api_random():
+    """Words API (RapidAPI): random word with definition (Daily Safe Word)."""
+    if not words_api_rapidapi_service.is_configured():
+        raise HTTPException(
+            status_code=503,
+            detail="Words API (RapidAPI) is not configured (WORDS_API_RAPIDAPI_KEY)",
+        )
+    payload = await words_api_rapidapi_service.get_random_daily_word()
+    if not payload.get("ok"):
+        raise HTTPException(
+            status_code=payload.get("status") or 502,
+            detail=payload.get("error") or "Words API random word failed",
+        )
+    return {
+        "success": True,
+        "word": payload.get("word", ""),
+        "definition": payload.get("definition", ""),
+        "data": payload.get("data"),
+    }
+
+@app.get("/words-api/{word}/{detail}")
+async def words_api_lookup_detail(word: str, detail: str):
+    """Words API (RapidAPI): detail endpoint (synonyms, rhymes, frequency, etc.)."""
+    if not words_api_rapidapi_service.is_configured():
+        raise HTTPException(
+            status_code=503,
+            detail="Words API (RapidAPI) is not configured (WORDS_API_RAPIDAPI_KEY)",
+        )
+    clean = word.strip().lower()
+    if not clean or not clean.isalpha():
+        raise HTTPException(status_code=400, detail="Word must contain only letters")
+    payload = await words_api_rapidapi_service.get_word_detail(clean, detail)
+    if not payload.get("ok"):
+        raise HTTPException(
+            status_code=payload.get("status") or 502,
+            detail=payload.get("error") or "Words API request failed",
+        )
+    return {"success": True, "word": clean, "detail": detail, "data": payload["data"]}
+
+@app.get("/words-api/{word}")
+async def words_api_lookup_word(word: str):
+    """Words API (RapidAPI): full word lookup with synonyms, rhymes, frequency."""
+    if not words_api_rapidapi_service.is_configured():
+        raise HTTPException(
+            status_code=503,
+            detail="Words API (RapidAPI) is not configured (WORDS_API_RAPIDAPI_KEY)",
+        )
+    clean = word.strip().lower()
+    if not clean or not clean.isalpha():
+        raise HTTPException(status_code=400, detail="Word must contain only letters")
+    result = await words_api_rapidapi_service.validate_word(clean)
+    return {"success": bool(result.get("is_valid")), **result}
+
 @app.get("/words/freedictionary")
 async def lookup_freedictionary_word(word: str = Query(..., min_length=1)):
     """Look up a word on TheFreeDictionary (dictionary, with encyclopedia fallback)."""
@@ -1074,6 +1285,78 @@ async def lookup_freedictionary_word_post(request: FreeDictionaryLookupRequest):
     except Exception as e:
         logger.error(f"FreeDictionary lookup failed for '{request.word}': {e}")
         raise HTTPException(status_code=500, detail="FreeDictionary lookup failed")
+
+@app.get("/datamuse/words")
+async def datamuse_words(
+    sp: Optional[str] = Query(None, description="Spelled like"),
+    ml: Optional[str] = Query(None, description="Means like"),
+    sl: Optional[str] = Query(None, description="Sounds like"),
+    rel_syn: Optional[str] = Query(None),
+    rel_trg: Optional[str] = Query(None),
+    rel_jja: Optional[str] = Query(None),
+    rel_jjb: Optional[str] = Query(None),
+    topics: Optional[str] = Query(None),
+    max_results: int = Query(100, alias="max", ge=1, le=1000),
+    md: Optional[str] = Query(None, description="Metadata flags, e.g. d for definitions"),
+):
+    """DataMuse word-finding API proxy."""
+    if not datamuse_service.is_configured():
+        raise HTTPException(status_code=503, detail="DataMuse is disabled")
+    params = {
+        "sp": sp,
+        "ml": ml,
+        "sl": sl,
+        "rel_syn": rel_syn,
+        "rel_trg": rel_trg,
+        "rel_jja": rel_jja,
+        "rel_jjb": rel_jjb,
+        "topics": topics,
+        "max": max_results,
+        "md": md,
+    }
+    payload = await datamuse_service.query_words(**params)
+    if not payload.get("ok"):
+        raise HTTPException(
+            status_code=payload.get("status") or 502,
+            detail=payload.get("error") or "DataMuse query failed",
+        )
+    return {"success": True, "words": payload["data"]}
+
+@app.get("/datamuse/sug")
+async def datamuse_suggest(
+    s: str = Query(..., min_length=1, description="Prefix for autocomplete"),
+    max_results: int = Query(10, alias="max", ge=1, le=100),
+):
+    """DataMuse autocomplete suggestions."""
+    if not datamuse_service.is_configured():
+        raise HTTPException(status_code=503, detail="DataMuse is disabled")
+    payload = await datamuse_service.suggest(s, max_results=max_results)
+    if not payload.get("ok"):
+        raise HTTPException(
+            status_code=payload.get("status") or 502,
+            detail=payload.get("error") or "DataMuse suggest failed",
+        )
+    return {"success": True, "suggestions": payload["data"]}
+
+@app.get("/puzzle/daily-scramble")
+async def get_daily_scramble_puzzle():
+    """Daily scrambled-word puzzle (cached per calendar day)."""
+    result = await daily_scramble_service.get_daily_scramble(local_words=words_list)
+    if not result.get("success"):
+        raise HTTPException(
+            status_code=503,
+            detail=result.get("error") or "Daily scramble unavailable",
+        )
+    return {
+        "success": True,
+        "date": result["date"],
+        "scrambled": result["scrambled"],
+        "hint": result.get("hint", ""),
+        "source": result.get("source", ""),
+        "cached": result.get("cached", False),
+        # Answer included for client-side validation; same for all users each day.
+        "word": result["word"],
+    }
 
 if __name__ == "__main__":
     import uvicorn

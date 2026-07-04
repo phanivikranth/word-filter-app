@@ -119,6 +119,56 @@ class OxfordValidator:
 
         return pronunciations[:4]
 
+    def _extract_etymology(
+        self, soup: BeautifulSoup
+    ) -> tuple[str, str, str]:
+        etymology = ""
+        origin_language = ""
+        first_known_use = ""
+
+        for selector in (
+            "span.etym",
+            "div.etym",
+            "span[class*='etym']",
+            "div[class*='etym']",
+            "p.etym",
+        ):
+            for elem in soup.select(selector):
+                text = elem.get_text(" ", strip=True)
+                if text and len(text) > 4:
+                    etymology = text
+                    break
+            if etymology:
+                break
+
+        if not etymology:
+            for elem in soup.find_all(string=re.compile(r"\borigin\b", re.I)):
+                parent = elem.parent
+                if parent:
+                    text = parent.get_text(" ", strip=True)
+                    if len(text) > 10:
+                        etymology = text
+                        break
+
+        if etymology:
+            from_match = re.search(
+                r"(?:from|via)\s+([A-Za-zÀ-ÿ][\w\s-]{1,40})",
+                etymology,
+                flags=re.IGNORECASE,
+            )
+            if from_match:
+                origin_language = from_match.group(1).strip().rstrip(".,;")
+
+        date_match = re.search(
+            r"(?:first recorded|first known use|since)\s+(\d{4}(?:\s*[-–]\s*\d{4})?)",
+            etymology,
+            flags=re.IGNORECASE,
+        )
+        if date_match:
+            first_known_use = date_match.group(1).strip()
+
+        return etymology, origin_language, first_known_use
+
     def _empty_word_result(self, word: str, **kwargs) -> Dict:
         base = {
             "word": word,
@@ -128,6 +178,10 @@ class OxfordValidator:
             "examples": [],
             "synonyms": [],
             "pronunciations": [],
+            "etymology": "",
+            "origin_language": "",
+            "first_known_use": "",
+            "source_url": "",
         }
         base.update(kwargs)
         return base
@@ -177,6 +231,8 @@ class OxfordValidator:
                 )
 
             pronunciations = self._extract_pronunciations(soup)
+            etymology, origin_language, first_known_use = self._extract_etymology(soup)
+            source_url = f"{self.base_url}{word}"
             
             # Extract definitions
             definitions = []
@@ -273,6 +329,11 @@ class OxfordValidator:
                 "examples": examples,
                 "synonyms": synonyms,
                 "pronunciations": pronunciations,
+                "etymology": etymology,
+                "origin_language": origin_language,
+                "first_known_use": first_known_use,
+                "source_url": source_url,
+                "oxford_url": source_url,
                 "reason": reason
             }
             

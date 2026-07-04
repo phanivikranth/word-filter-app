@@ -156,6 +156,35 @@ class FreeDictionaryService:
     )
 
     @staticmethod
+    def _extract_trailing_etymology(text: str) -> tuple[str, str]:
+        """Return (etymology_phrase, origin_language) from trailing [from X] bracket."""
+        match = re.search(r"\[([^\]]+)\]\s*$", text or "")
+        if not match:
+            return "", ""
+        bracket = match.group(1).strip()
+        if bracket.lower().startswith("from "):
+            return bracket, bracket[5:].strip()
+        if bracket.lower().startswith("via "):
+            return bracket, bracket[4:].strip()
+        return bracket, ""
+
+    @staticmethod
+    def _extract_synonyms_from_html(soup: BeautifulSoup, word: str) -> List[str]:
+        synonyms: List[str] = []
+        for anchor in soup.select("a[href*='thesaurus'], a[href*='synonym']"):
+            text = anchor.get_text(strip=True)
+            if (
+                text
+                and text.isalpha()
+                and text.lower() != word.lower()
+                and text not in synonyms
+            ):
+                synonyms.append(text)
+            if len(synonyms) >= 10:
+                break
+        return synonyms
+
+    @staticmethod
     def _polish_definition(entry: str) -> str:
         """
         Strip headword, pronunciation, and part-of-speech prefix from a dictionary line.
@@ -194,7 +223,7 @@ class FreeDictionaryService:
                 break
             text = stripped
 
-        # Trailing etymology bracket e.g. [from Yiddish]
+        # Trailing etymology bracket e.g. [from Yiddish] — kept in etymology field separately
         text = re.sub(r"\s*\[[^\]]+\]\s*$", "", text).strip()
 
         return text
@@ -246,7 +275,7 @@ class FreeDictionaryService:
                 return [{"prefix": "IPA", "ipa": ipa, "url": ""}]
         return []
 
-    def _parse_page(self, html: str, word: str = "") -> Dict[str, str]:
+    def _parse_page(self, html: str, word: str = "") -> Dict[str, Any]:
         soup = BeautifulSoup(html, "lxml")
         title = soup.title.string.strip() if soup.title and soup.title.string else ""
 
@@ -258,6 +287,8 @@ class FreeDictionaryService:
 
         definition_text = definition_el.get_text(" ", strip=True) if definition_el else ""
         main_text = main_el.get_text(" ", strip=True) if main_el else ""
+        body = definition_text or main_text or meta_description
+        etymology, origin_language = self._extract_trailing_etymology(body)
 
         return {
             "title": title,
@@ -267,6 +298,9 @@ class FreeDictionaryService:
             "pronunciations": self._extract_pronunciations(
                 word, f"{definition_text} {main_text}"
             ),
+            "etymology": etymology,
+            "origin_language": origin_language,
+            "synonyms": self._extract_synonyms_from_html(soup, word),
         }
 
     @staticmethod
@@ -318,6 +352,9 @@ class FreeDictionaryService:
                 "summary": summary,
                 "encyclopedia_summary": None,
                 "pronunciations": dict_parsed.get("pronunciations") or [],
+                "synonyms": dict_parsed.get("synonyms") or [],
+                "etymology": dict_parsed.get("etymology") or "",
+                "origin_language": dict_parsed.get("origin_language") or "",
                 "title": dict_parsed["title"],
                 "dictionary_url": dictionary_url,
                 "encyclopedia_url": encyclopedia_url,
@@ -410,7 +447,13 @@ class FreeDictionaryService:
             "definitions": definitions,
             "word_forms": [],
             "examples": [],
-            "synonyms": [],
+            "synonyms": list(data.get("synonyms") or []),
+            "pronunciations": list(data.get("pronunciations") or []),
+            "etymology": (data.get("etymology") or "").strip(),
+            "origin_language": (data.get("origin_language") or "").strip(),
+            "first_known_use": "",
+            "dictionary_url": data.get("dictionary_url", ""),
+            "encyclopedia_url": data.get("encyclopedia_url", ""),
             "reason": data.get("reason", "Found in TheFreeDictionary" if found else "Not found"),
             "source": data.get("source", "freedictionary" if found else "none"),
         }

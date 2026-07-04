@@ -14,6 +14,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import time
 from datetime import date
 from pathlib import Path
@@ -161,6 +162,9 @@ class OxfordDictionariesApiValidator:
         word_forms: List[str] = []
         synonyms: List[str] = []
         pronunciations: List[Dict[str, str]] = []
+        etymology = ""
+        origin_language = ""
+        first_known_use = ""
         seen_pron: set[tuple[str, str]] = set()
 
         for result in results:
@@ -190,6 +194,18 @@ class OxfordDictionariesApiValidator:
                     )
 
                 for entry in lexical_entry.get("entries", []):
+                    for ety in entry.get("etymologies", []):
+                        text = ety.get("text") if isinstance(ety, dict) else str(ety)
+                        text = (text or "").strip()
+                        if text and not etymology:
+                            etymology = text
+                            from_match = re.search(
+                                r"(?:from|via)\s+([A-Za-z][\w\s-]{1,40})",
+                                text,
+                                flags=re.IGNORECASE,
+                            )
+                            if from_match:
+                                origin_language = from_match.group(1).strip().rstrip(".,;")
                     for sense in entry.get("senses", []):
                         for definition in sense.get("definitions", []):
                             if isinstance(definition, str) and definition not in definitions:
@@ -222,9 +238,14 @@ class OxfordDictionariesApiValidator:
             "word_forms": word_forms[:5],
             "examples": examples[:5],
             "pronunciations": pronunciations[:4],
+            "etymology": etymology,
+            "origin_language": origin_language,
+            "first_known_use": first_known_use,
             "reason": reason,
             "source": "oxford_dictionaries_api",
             "raw_id": data.get("id"),
+            "source_url": f"https://www.oxfordlearnersdictionaries.com/definition/english/{word}",
+            "oxford_url": f"https://www.oxfordlearnersdictionaries.com/definition/english/{word}",
         }
 
     async def fetch_endpoint(

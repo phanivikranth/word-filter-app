@@ -73,12 +73,13 @@ export class WordService {
               oxford: valResponse.oxford_validation
             };
           }),
-          catchError(() => {
-            // Even if Oxford fails, return collection status
+          catchError((error) => {
+            console.error('Dictionary validation failed:', error);
             return of({
               word: cleanWord,
               inCollection,
-              oxford: null
+              oxford: null,
+              lookupFailed: true
             });
           })
         );
@@ -136,7 +137,19 @@ export class WordService {
   }
 
   // Expose advanced puzzle solver endpoint
-  getPuzzleWords(filters: {pattern?: string, regex?: string, anagram?: string, anagram_exact?: boolean, limit?: number}): Observable<string[]> {
+  getPuzzleWords(filters: {
+    pattern?: string;
+    regex?: string;
+    anagram?: string;
+    anagram_exact?: boolean;
+    limit?: number;
+    sp?: string;
+    ml?: string;
+    sl?: string;
+    rel_syn?: string;
+    rel_trg?: string;
+    include_datamuse?: boolean;
+  }): Observable<string[]> {
     let params = new HttpParams();
     if (filters.pattern) {
       params = params.set('pattern', filters.pattern);
@@ -153,6 +166,24 @@ export class WordService {
     if (filters.limit) {
       params = params.set('limit', filters.limit.toString());
     }
+    if (filters.sp) {
+      params = params.set('sp', filters.sp);
+    }
+    if (filters.ml) {
+      params = params.set('ml', filters.ml);
+    }
+    if (filters.sl) {
+      params = params.set('sl', filters.sl);
+    }
+    if (filters.rel_syn) {
+      params = params.set('rel_syn', filters.rel_syn);
+    }
+    if (filters.rel_trg) {
+      params = params.set('rel_trg', filters.rel_trg);
+    }
+    if (filters.include_datamuse !== undefined) {
+      params = params.set('include_datamuse', filters.include_datamuse.toString());
+    }
     return this.http.get<string[]>(`${this.baseUrl}/words/puzzle`, { params });
   }
 
@@ -166,6 +197,78 @@ export class WordService {
       params = params.set('ends_with', endsWith);
     }
     return this.http.get<any>(`${this.baseUrl}/words/random`, { params });
+  }
+
+  /** Daily Safe Word — Words API random=true, definition only in UI */
+  getDailySafeWord(): Observable<DailySafeWordResponse> {
+    return this.http.get<DailySafeWordResponse>(`${this.baseUrl}/words-api/random`);
+  }
+
+  /** Word Game DB — categories */
+  getWordGameDbCategories(): Observable<{ success: boolean; categories: string[] }> {
+    return this.http.get<{ success: boolean; categories: string[] }>(
+      `${this.baseUrl}/word-game-db/categories`
+    );
+  }
+
+  /** Word Game DB — random word */
+  getWordGameDbRandom(): Observable<DailySafeWordResponse> {
+    return this.http.get<DailySafeWordResponse>(`${this.baseUrl}/word-game-db/random`);
+  }
+
+  /** Word Game DB — filtered word list */
+  searchWordGameDb(params: {
+    minLetters?: number;
+    maxLetters?: number;
+    minSyllables?: number;
+    maxSyllables?: number;
+    limit?: number;
+    offset?: number;
+    category?: string;
+  }): Observable<any> {
+    let httpParams = new HttpParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        httpParams = httpParams.set(key, String(value));
+      }
+    });
+    return this.http.get<any>(`${this.baseUrl}/word-game-db/words`, { params: httpParams });
+  }
+
+  /** DataMuse word-finding query */
+  queryDatamuse(params: {
+    sp?: string;
+    ml?: string;
+    sl?: string;
+    rel_syn?: string;
+    rel_trg?: string;
+    max?: number;
+    md?: string;
+  }): Observable<{ success: boolean; words: any[] }> {
+    let httpParams = new HttpParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        httpParams = httpParams.set(key, String(value));
+      }
+    });
+    return this.http.get<{ success: boolean; words: any[] }>(
+      `${this.baseUrl}/datamuse/words`,
+      { params: httpParams }
+    );
+  }
+
+  /** DataMuse autocomplete suggestions */
+  datamuseSuggest(prefix: string, max = 10): Observable<{ success: boolean; suggestions: any[] }> {
+    const params = new HttpParams().set('s', prefix).set('max', String(max));
+    return this.http.get<{ success: boolean; suggestions: any[] }>(
+      `${this.baseUrl}/datamuse/sug`,
+      { params }
+    );
+  }
+
+  /** Daily scrambled-word puzzle (rotates each calendar day) */
+  getDailyScramble(): Observable<DailyScrambleResponse> {
+    return this.http.get<DailyScrambleResponse>(`${this.baseUrl}/puzzle/daily-scramble`);
   }
 
   // Get storage connectivity info
@@ -204,6 +307,7 @@ export interface BasicSearchResult {
   word: string;
   inCollection: boolean;
   oxford: OxfordValidation | null;
+  lookupFailed?: boolean;
 }
 
 export interface OxfordValidation {
@@ -214,6 +318,26 @@ export interface OxfordValidation {
   pronunciations?: Pronunciation[];
   examples?: string[];
   synonyms?: string[];
+  etymology?: string;
+  origin_language?: string;
+  first_known_use?: string;
+  summary?: string;
+  validation_source?: string;
+  links?: Record<string, string>;
+  dictionary_url?: string;
+  encyclopedia_url?: string;
+  rhymes?: string[];
+  antonyms?: string[];
+  frequency?: number | null;
+  frequency_details?: Record<string, unknown>;
+  words_api_details?: Record<string, unknown>;
+  word_game_db?: {
+    category?: string;
+    hint?: string;
+    numLetters?: number;
+    numSyllables?: number;
+    _id?: string;
+  };
   reason: string;
 }
 
@@ -221,6 +345,22 @@ export interface Pronunciation {
   prefix: string;  // BrE, NAmE
   ipa: string;     // IPA notation
   url?: string;    // Audio URL
+}
+
+export interface DailySafeWordResponse {
+  success: boolean;
+  word: string;
+  definition: string;
+}
+
+export interface DailyScrambleResponse {
+  success: boolean;
+  date: string;
+  word: string;
+  scrambled: string;
+  hint: string;
+  source?: string;
+  cached?: boolean;
 }
 
 export interface OxfordValidationResponse {

@@ -170,116 +170,255 @@
 
         <!-- Word Analysis Result Panel -->
         <div *ngIf="searchResult && !isSearching" class="clay-card p-6 flex flex-col gap-5">
+          <!-- Header -->
           <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-surface-variant dark:border-outline pb-4">
-            <div class="flex items-center gap-3">
-              <div class="w-12 h-12 rounded-full flex items-center justify-center text-white"
+            <div class="flex items-start gap-3 min-w-0">
+              <div class="w-12 h-12 shrink-0 rounded-full flex items-center justify-center text-white"
                    [ngClass]="searchResult.oxford?.is_valid || searchResult.inCollection ? 'bg-primary' : 'bg-error'">
                 <span class="material-symbols-rounded text-3xl icon-filled">
                   {{ searchResult.oxford?.is_valid || searchResult.inCollection ? 'verified' : 'cancel' }}
                 </span>
               </div>
-              <div>
+              <div class="min-w-0">
                 <h3 class="font-headline-lg text-on-surface dark:text-on-surface flex items-center gap-2 flex-wrap">
                   {{ searchResult.word | titlecase }}
-                  <span *ngIf="searchResult.oxford?.pronunciations?.length"
-                        class="text-body-md text-outline font-normal">
+                  <button *ngIf="searchResult.oxford?.pronunciations?.length"
+                          type="button"
+                          class="inline-flex items-center gap-1 text-body-md text-outline font-normal hover:text-primary transition-colors"
+                          (click)="playPronunciation(searchResult.oxford!.pronunciations![0].url, searchResult.word)"
+                          [title]="searchResult.oxford!.pronunciations![0].url ? 'Play pronunciation' : 'Speak word'">
+                    <span class="material-symbols-rounded text-base">volume_up</span>
                     /{{ searchResult.oxford!.pronunciations![0].ipa }}/
-                  </span>
+                  </button>
                 </h3>
-                <div class="flex gap-2 mt-1">
-                  <span *ngIf="searchResult.oxford && searchResult.oxford.word_forms && searchResult.oxford.word_forms.length > 0" class="px-2 py-0.5 bg-surface-container-high dark:bg-on-surface-variant text-on-surface-variant dark:text-on-surface rounded-full font-label-sm text-label-sm">
-                    {{ searchResult.oxford.word_forms[0] | titlecase }}
+                <div class="flex gap-2 mt-2 flex-wrap">
+                  <span *ngFor="let form of searchResult.oxford?.word_forms | slice:0:4"
+                        class="px-2 py-0.5 bg-surface-container-high dark:bg-on-surface-variant text-on-surface-variant dark:text-on-surface rounded-full font-label-sm text-label-sm">
+                    {{ form | titlecase }}
                   </span>
-                  <span *ngIf="searchResult.inCollection" class="px-2 py-0.5 bg-primary-container text-on-primary-fixed-variant rounded-full font-label-sm text-label-sm">
+                  <span *ngIf="searchResult.inCollection"
+                        class="px-2 py-0.5 bg-primary-container text-on-primary-fixed-variant rounded-full font-label-sm text-label-sm">
                     In Dictionary File
+                  </span>
+                  <span *ngIf="searchResult.oxford?.validation_source"
+                        class="px-2 py-0.5 bg-secondary-container/60 text-on-secondary-container rounded-full font-label-sm text-label-sm flex items-center gap-1">
+                    <span class="material-symbols-rounded text-xs">source</span>
+                    {{ getValidationSourceLabel(searchResult.oxford!.validation_source) }}
                   </span>
                 </div>
               </div>
             </div>
 
-            <!-- Safety Indicator Score -->
-            <div class="text-left md:text-right">
-              <div class="font-headline-md font-bold" [ngClass]="searchResult.oxford?.is_valid || searchResult.inCollection ? 'text-primary' : 'text-error'">
+            <div class="text-left md:text-right shrink-0">
+              <div class="font-headline-md font-bold"
+                   [ngClass]="searchResult.oxford?.is_valid || searchResult.inCollection ? 'text-primary' : 'text-error'">
                 {{ searchResult.oxford?.is_valid || searchResult.inCollection ? '100% Safe' : 'Unverified' }}
               </div>
               <div class="font-label-sm text-label-sm text-outline uppercase tracking-wider">Safety Status</div>
             </div>
           </div>
 
-          <!-- Reason block -->
-          <div class="bg-surface-container dark:bg-on-secondary-fixed/50 p-4 rounded-xl border border-surface-variant dark:border-outline">
-            <h4 class="font-label-md text-label-md text-on-surface dark:text-on-surface mb-1 flex items-center gap-2">
-              <span class="material-symbols-rounded text-secondary text-sm">info</span>
-              Safety and Context Analysis
-            </h4>
-            <p class="font-body-md text-on-surface-variant dark:text-on-surface-variant">
-              {{ searchResult.oxford?.reason || 'No specific safety explanation available.' }}
+          <!-- No dictionary content -->
+          <div *ngIf="!hasDictionaryContent(searchResult.oxford) && !searchResult.inCollection"
+               class="bg-surface-container dark:bg-on-secondary-fixed/50 p-6 rounded-xl border border-dashed border-surface-variant dark:border-outline text-center">
+            <span class="material-symbols-rounded text-4xl text-outline mb-2">menu_book</span>
+            <p class="font-body-md text-on-surface-variant">
+              No dictionary entry found yet for <strong>{{ searchResult.word }}</strong>.
+            </p>
+            <p class="font-label-sm text-outline mt-1">
+              Try another spelling, or check back after the word is enriched in the database.
             </p>
           </div>
 
-          <!-- Pronunciation -->
-          <div *ngIf="searchResult.oxford?.pronunciations?.length"
-               class="bg-surface-container dark:bg-on-secondary-fixed/50 p-4 rounded-xl border border-surface-variant dark:border-outline">
-            <h4 class="font-label-md text-label-md text-on-surface dark:text-on-surface mb-3 flex items-center gap-2">
-              <span class="material-symbols-rounded text-primary">record_voice_over</span>
-              Pronunciation
-            </h4>
-            <div class="flex flex-col gap-2">
-              <div *ngFor="let pron of searchResult.oxford!.pronunciations!"
-                   class="flex flex-wrap items-center gap-3 py-2 border-b border-surface-variant/50 last:border-0">
-                <span class="px-2 py-0.5 rounded-full bg-primary-container text-on-primary-fixed-variant font-label-sm text-label-sm">
-                  {{ pron.prefix || 'Standard' }}
-                </span>
-                <span class="font-body-lg text-on-surface tracking-wide">/{{ pron.ipa }}/</span>
-                <button type="button"
-                        class="w-10 h-10 rounded-full bg-primary/10 hover:bg-primary/20 flex items-center justify-center transition-colors"
-                        [title]="pron.url ? 'Play audio' : 'Speak word'"
-                        (click)="playPronunciation(pron.url, searchResult.word)">
-                  <span class="material-symbols-rounded text-primary icon-filled">volume_up</span>
-                </button>
+          <!-- Summary lead -->
+          <div *ngIf="showSummary(searchResult.oxford)"
+               class="bg-primary-container/20 dark:bg-primary-container/10 p-4 rounded-xl border border-primary/20">
+            <p class="font-body-lg text-on-surface dark:text-on-surface leading-relaxed">
+              {{ searchResult.oxford!.summary }}
+            </p>
+          </div>
+
+          <!-- Source note -->
+          <div *ngIf="searchResult.oxford?.reason"
+               class="bg-surface-container dark:bg-on-secondary-fixed/50 px-4 py-3 rounded-xl border border-surface-variant dark:border-outline">
+            <p class="font-label-sm text-label-sm text-outline flex items-start gap-2">
+              <span class="material-symbols-rounded text-secondary text-sm mt-0.5">info</span>
+              <span>{{ searchResult.oxford!.reason }}</span>
+            </p>
+          </div>
+
+          <!-- Main content grid: definitions + side panels -->
+          <div *ngIf="hasDictionaryContent(searchResult.oxford)"
+               class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+            <!-- Left: definitions, examples, synonyms -->
+            <div class="lg:col-span-2 flex flex-col gap-5">
+              <div *ngIf="searchResult.oxford?.definitions?.length"
+                   class="bg-surface-container dark:bg-on-secondary-fixed/50 p-4 rounded-xl border border-surface-variant dark:border-outline">
+                <h4 class="font-label-md text-label-md text-on-surface dark:text-on-surface mb-3 flex items-center gap-2">
+                  <span class="material-symbols-rounded text-primary">book</span>
+                  Definitions
+                </h4>
+                <ol class="space-y-3 pl-1 list-none counter-reset-def">
+                  <li *ngFor="let def of searchResult.oxford!.definitions!; let i = index"
+                      class="flex gap-3 text-body-md text-on-surface-variant dark:text-on-surface-variant">
+                    <span class="shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary font-label-sm text-label-sm flex items-center justify-center">
+                      {{ i + 1 }}
+                    </span>
+                    <span class="pt-0.5">{{ def }}</span>
+                  </li>
+                </ol>
+              </div>
+
+              <div *ngIf="searchResult.oxford?.examples?.length"
+                   class="bg-surface-container dark:bg-on-secondary-fixed/50 p-4 rounded-xl border border-surface-variant dark:border-outline">
+                <h4 class="font-label-md text-label-md text-on-surface dark:text-on-surface mb-3 flex items-center gap-2">
+                  <span class="material-symbols-rounded text-primary">format_quote</span>
+                  Example Sentences
+                </h4>
+                <ul class="space-y-2">
+                  <li *ngFor="let ex of searchResult.oxford!.examples!"
+                      class="pl-3 border-l-2 border-primary/30 font-body-md italic text-on-surface-variant">
+                    {{ ex }}
+                  </li>
+                </ul>
+              </div>
+
+              <div *ngIf="searchResult.oxford?.synonyms?.length"
+                   class="bg-surface-container dark:bg-on-secondary-fixed/50 p-4 rounded-xl border border-surface-variant dark:border-outline">
+                <h4 class="font-label-md text-label-md text-on-surface dark:text-on-surface mb-3 flex items-center gap-2">
+                  <span class="material-symbols-rounded text-primary">tag</span>
+                  Synonyms
+                  <span class="font-label-sm text-outline font-normal">— click to explore</span>
+                </h4>
+                <div class="flex flex-wrap gap-2">
+                  <button *ngFor="let syn of searchResult.oxford!.synonyms!"
+                          type="button"
+                          (click)="exploreWord(syn)"
+                          class="px-3 py-1 bg-tertiary-container/30 text-on-tertiary-container hover:bg-tertiary-container/60 transition-colors border border-tertiary-container/20 rounded-full font-label-sm text-label-sm cursor-pointer shadow-sm">
+                    {{ syn }}
+                  </button>
+                </div>
+              </div>
+
+              <div *ngIf="searchResult.oxford?.antonyms?.length"
+                   class="bg-surface-container dark:bg-on-secondary-fixed/50 p-4 rounded-xl border border-surface-variant dark:border-outline">
+                <h4 class="font-label-md text-label-md text-on-surface dark:text-on-surface mb-3 flex items-center gap-2">
+                  <span class="material-symbols-rounded text-primary">block</span>
+                  Antonyms
+                </h4>
+                <div class="flex flex-wrap gap-2">
+                  <button *ngFor="let ant of searchResult.oxford!.antonyms!"
+                          type="button"
+                          (click)="exploreWord(ant)"
+                          class="px-3 py-1 bg-error-container/20 text-on-error-container hover:bg-error-container/40 transition-colors border border-error-container/20 rounded-full font-label-sm text-label-sm cursor-pointer shadow-sm">
+                    {{ ant }}
+                  </button>
+                </div>
+              </div>
+
+              <div *ngIf="searchResult.oxford?.rhymes?.length"
+                   class="bg-surface-container dark:bg-on-secondary-fixed/50 p-4 rounded-xl border border-surface-variant dark:border-outline">
+                <h4 class="font-label-md text-label-md text-on-surface dark:text-on-surface mb-3 flex items-center gap-2">
+                  <span class="material-symbols-rounded text-primary">music_note</span>
+                  Rhymes
+                </h4>
+                <div class="flex flex-wrap gap-2">
+                  <button *ngFor="let rhyme of searchResult.oxford!.rhymes!"
+                          type="button"
+                          (click)="exploreWord(rhyme)"
+                          class="px-3 py-1 bg-secondary-container/30 text-on-secondary-container hover:bg-secondary-container/60 transition-colors border border-secondary-container/20 rounded-full font-label-sm text-label-sm cursor-pointer shadow-sm">
+                    {{ rhyme }}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right: pronunciation, origin, links -->
+            <div class="flex flex-col gap-5">
+              <div *ngIf="searchResult.oxford?.frequency != null"
+                   class="bg-surface-container dark:bg-on-secondary-fixed/50 p-4 rounded-xl border border-surface-variant dark:border-outline">
+                <h4 class="font-label-md text-label-md text-on-surface dark:text-on-surface mb-2 flex items-center gap-2">
+                  <span class="material-symbols-rounded text-primary">bar_chart</span>
+                  Word frequency
+                </h4>
+                <p class="font-body-md text-on-surface-variant">
+                  Usage score: <strong class="text-on-surface">{{ searchResult.oxford!.frequency }}</strong>
+                  <span class="text-outline"> (Words API — higher means more common)</span>
+                </p>
+              </div>
+
+              <div *ngIf="searchResult.oxford?.pronunciations?.length"
+                   class="bg-surface-container dark:bg-on-secondary-fixed/50 p-4 rounded-xl border border-surface-variant dark:border-outline">
+                <h4 class="font-label-md text-label-md text-on-surface dark:text-on-surface mb-3 flex items-center gap-2">
+                  <span class="material-symbols-rounded text-primary">record_voice_over</span>
+                  Pronunciation
+                </h4>
+                <div class="flex flex-col gap-2">
+                  <div *ngFor="let pron of searchResult.oxford!.pronunciations!"
+                       class="flex items-center justify-between gap-2 py-2 border-b border-surface-variant/50 last:border-0">
+                    <div class="min-w-0">
+                      <span class="px-2 py-0.5 rounded-full bg-primary-container text-on-primary-fixed-variant font-label-sm text-label-sm">
+                        {{ pron.prefix || 'Standard' }}
+                      </span>
+                      <span class="ml-2 font-body-md text-on-surface tracking-wide">/{{ pron.ipa }}/</span>
+                    </div>
+                    <button type="button"
+                            class="shrink-0 w-9 h-9 rounded-full bg-primary/10 hover:bg-primary/20 flex items-center justify-center transition-colors"
+                            [title]="pron.url ? 'Play audio' : 'Speak word'"
+                            (click)="playPronunciation(pron.url, searchResult.word)">
+                      <span class="material-symbols-rounded text-primary icon-filled text-xl">volume_up</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div *ngIf="hasWordOrigin(searchResult.oxford)"
+                   class="bg-surface-container dark:bg-on-secondary-fixed/50 p-4 rounded-xl border border-surface-variant dark:border-outline">
+                <h4 class="font-label-md text-label-md text-on-surface dark:text-on-surface mb-3 flex items-center gap-2">
+                  <span class="material-symbols-rounded text-secondary">history_edu</span>
+                  Word Origin
+                </h4>
+                <p *ngIf="searchResult.oxford?.etymology"
+                   class="font-body-md text-on-surface-variant dark:text-on-surface-variant mb-3 leading-relaxed">
+                  {{ searchResult.oxford!.etymology }}
+                </p>
+                <div class="flex flex-col gap-2 text-body-sm text-outline">
+                  <span *ngIf="searchResult.oxford?.origin_language"
+                        class="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-surface-container-high/80">
+                    <span class="material-symbols-rounded text-sm text-secondary">translate</span>
+                    <span><strong class="text-on-surface-variant">Origin:</strong> {{ searchResult.oxford!.origin_language }}</span>
+                  </span>
+                  <span *ngIf="searchResult.oxford?.first_known_use"
+                        class="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-surface-container-high/80">
+                    <span class="material-symbols-rounded text-sm text-secondary">calendar_today</span>
+                    <span><strong class="text-on-surface-variant">First known use:</strong> {{ searchResult.oxford!.first_known_use }}</span>
+                  </span>
+                </div>
+              </div>
+
+              <div *ngIf="getDictionaryLinks(searchResult.oxford).length"
+                   class="bg-surface-container dark:bg-on-secondary-fixed/50 p-4 rounded-xl border border-surface-variant dark:border-outline">
+                <h4 class="font-label-md text-label-md text-on-surface dark:text-on-surface mb-3 flex items-center gap-2">
+                  <span class="material-symbols-rounded text-primary">link</span>
+                  Reference Links
+                </h4>
+                <div class="flex flex-col gap-2">
+                  <a *ngFor="let link of getDictionaryLinks(searchResult.oxford)"
+                     [href]="link.url"
+                     target="_blank"
+                     rel="noopener noreferrer"
+                     class="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-primary-container/30 hover:bg-primary-container/50 transition-colors group">
+                    <span class="font-label-sm text-label-sm text-on-primary-fixed-variant capitalize">{{ link.key }}</span>
+                    <span class="material-symbols-rounded text-sm text-primary group-hover:translate-x-0.5 transition-transform">open_in_new</span>
+                  </a>
+                </div>
               </div>
             </div>
           </div>
 
-          <!-- Oxford Definitions block -->
-          <div *ngIf="searchResult.oxford && searchResult.oxford.definitions && searchResult.oxford.definitions.length > 0">
-            <h4 class="font-label-md text-on-surface dark:text-on-surface mb-2 flex items-center gap-1.5">
-              <span class="material-symbols-rounded text-primary">book</span>
-              Definitions
-            </h4>
-            <ul class="space-y-2 pl-4 list-disc text-body-md text-on-surface-variant dark:text-on-surface-variant">
-              <li *ngFor="let def of searchResult.oxford.definitions">{{ def }}</li>
-            </ul>
-          </div>
-
-          <!-- Oxford Examples block -->
-          <div *ngIf="searchResult.oxford && searchResult.oxford.examples && searchResult.oxford.examples.length > 0">
-            <h4 class="font-label-md text-on-surface dark:text-on-surface mb-2 flex items-center gap-1.5">
-              <span class="material-symbols-rounded text-primary">chat_bubble</span>
-              Example Sentences
-            </h4>
-            <ul class="space-y-2 pl-4 text-body-md italic text-outline">
-              <li *ngFor="let ex of searchResult.oxford.examples">"{{ ex }}"</li>
-            </ul>
-          </div>
-
-          <!-- Synonym Chips -->
-          <div *ngIf="searchResult.oxford && searchResult.oxford.synonyms && searchResult.oxford.synonyms.length > 0">
-            <h4 class="font-label-md text-on-surface dark:text-on-surface mb-2 flex items-center gap-1.5">
-              <span class="material-symbols-rounded text-primary">tag</span>
-              Synonyms (Click to explore)
-            </h4>
-            <div class="flex flex-wrap gap-2">
-              <span *ngFor="let syn of searchResult.oxford.synonyms" 
-                    (click)="exploreWord(syn)"
-                    class="px-3 py-1 bg-tertiary-container/30 text-on-tertiary-container hover:bg-tertiary-container/60 transition-colors border border-tertiary-container/20 rounded-full font-label-sm text-label-sm cursor-pointer shadow-sm">
-                {{ syn }}
-              </span>
-            </div>
-          </div>
-
-          <!-- Action Add Word to collection if not already in it -->
-          <div *ngIf="!searchResult.inCollection && searchResult.oxford && searchResult.oxford.is_valid" class="mt-4 border-t border-surface-variant dark:border-outline pt-4 flex justify-end">
+          <!-- Add to collection -->
+          <div *ngIf="!searchResult.inCollection && searchResult.oxford?.is_valid"
+               class="border-t border-surface-variant dark:border-outline pt-4 flex justify-end">
             <button class="px-6 py-3 bg-primary text-on-primary rounded-xl font-label-md text-label-md hover:bg-surface-tint transition-all"
                     (click)="addWordToCollection(searchResult.word)">
               Add Word to Local Dictionary
@@ -325,22 +464,26 @@
                 Word Puzzle of the Day
               </h3>
               <p class="font-body-md text-on-surface-variant dark:text-on-surface-variant mb-4">
-                Unscramble this positive word to learn something new today.
+                Unscramble today's word to learn something new.
               </p>
+
+              <p *ngIf="dailyScrambleLoading" class="text-sm text-on-surface-variant italic mb-4">
+                Loading today's puzzle...
+              </p>
+              <p *ngIf="dailyScrambleError" class="text-sm text-error mb-4">{{ dailyScrambleError }}</p>
               
               <!-- Scrambled letter boxes -->
-              <div class="flex gap-2 mb-4 justify-start">
-                <div class="w-12 h-12 bg-surface dark:bg-surface-container border border-surface-variant dark:border-outline rounded-lg flex items-center justify-center font-headline-lg text-headline-lg text-primary shadow-sm font-bold">E</div>
-                <div class="w-12 h-12 bg-surface dark:bg-surface-container border border-surface-variant dark:border-outline rounded-lg flex items-center justify-center font-headline-lg text-headline-lg text-primary shadow-sm font-bold">E</div>
-                <div class="w-12 h-12 bg-surface dark:bg-surface-container border border-surface-variant dark:border-outline rounded-lg flex items-center justify-center font-headline-lg text-headline-lg text-primary shadow-sm font-bold">R</div>
-                <div class="w-12 h-12 bg-surface dark:bg-surface-container border border-surface-variant dark:border-outline rounded-lg flex items-center justify-center font-headline-lg text-headline-lg text-primary shadow-sm font-bold">S</div>
-                <div class="w-12 h-12 bg-surface dark:bg-surface-container border border-surface-variant dark:border-outline rounded-lg flex items-center justify-center font-headline-lg text-headline-lg text-primary shadow-sm font-bold">T</div>
+              <div *ngIf="!dailyScrambleLoading && dailyScrambleLetters.length" class="flex gap-2 mb-4 justify-start flex-wrap">
+                <div *ngFor="let letter of dailyScrambleLetters"
+                     class="w-12 h-12 bg-surface dark:bg-surface-container border border-surface-variant dark:border-outline rounded-lg flex items-center justify-center font-headline-lg text-headline-lg text-primary shadow-sm font-bold">
+                  {{ letter }}
+                </div>
               </div>
               
               <!-- Hint -->
-              <div class="text-sm font-label-md text-outline flex items-center gap-1">
+              <div *ngIf="dailyScrambleHint" class="text-sm font-label-md text-outline flex items-center gap-1">
                 <span class="material-symbols-rounded text-sm">lightbulb</span> 
-                Hint: Short and to the point.
+                Hint: {{ dailyScrambleHint }}
               </div>
             </div>
 
@@ -358,7 +501,7 @@
                 </button>
               </div>
               <div *ngIf="puzzleChecked" class="text-xs font-bold text-center mt-1">
-                <span *ngIf="puzzleSuccess" class="text-green-600 dark:text-green-400">🎉 Correct! The word of the day is Terse.</span>
+                <span *ngIf="puzzleSuccess" class="text-green-600 dark:text-green-400">🎉 Correct! The word of the day is {{ dailyScrambleWord | titlecase }}.</span>
                 <span *ngIf="!puzzleSuccess" class="text-red-500 dark:text-red-400">❌ Incorrect guess. Try again!</span>
               </div>
             </div>
@@ -526,6 +669,23 @@
                 </label>
               </div>
               <span class="text-xs text-outline mt-1 block">Find words that can be built from these letters pool.</span>
+            </div>
+          </div>
+
+          <!-- DataMuse word-finding (optional) -->
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 border-t border-surface-variant dark:border-outline pt-4">
+            <div>
+              <label class="block font-label-sm text-label-sm text-on-surface dark:text-on-surface mb-1.5">Means like (DataMuse)</label>
+              <input type="text" [(ngModel)]="puzzleMeansLike" placeholder="e.g. happy" class="w-full p-3 clay-input text-body-md outline-none"/>
+            </div>
+            <div>
+              <label class="block font-label-sm text-label-sm text-on-surface dark:text-on-surface mb-1.5">Sounds like (DataMuse)</label>
+              <input type="text" [(ngModel)]="puzzleSoundsLike" placeholder="e.g. jirraf" class="w-full p-3 clay-input text-body-md outline-none"/>
+            </div>
+            <div>
+              <label class="block font-label-sm text-label-sm text-on-surface dark:text-on-surface mb-1.5">Spelled like (DataMuse)</label>
+              <input type="text" [(ngModel)]="puzzleSpelledLike" placeholder="e.g. sp???" class="w-full p-3 clay-input text-body-md outline-none"/>
+              <span class="text-xs text-outline mt-1 block">Use ? for unknown letters; merges with local results.</span>
             </div>
           </div>
 
@@ -1250,12 +1410,26 @@
 
         <!-- Daily Safe Word -->
         <div class="bg-background dark:bg-surface/30 p-6 rounded-2xl border border-surface-variant dark:border-outline shadow-[inset_1px_1px_3px_rgba(0,0,0,0.06)]">
-          <div class="flex items-center gap-2 mb-2 text-primary leading-none">
+          <div class="flex items-center gap-2 mb-3 text-primary leading-none">
             <span class="material-symbols-rounded icon-filled text-lg leading-none">today</span>
             <h4 class="font-label-md text-label-md uppercase tracking-wider font-bold leading-none">Daily Safe Word</h4>
           </div>
-          <div class="font-headline-lg text-headline-lg text-on-surface dark:text-on-surface mb-2">Empathy</div>
-          <p class="font-body-md text-on-surface-variant dark:text-on-surface-variant">The ability to understand and share the feelings of another. Encourages compassionate behavior!</p>
+          <p *ngIf="dailySafeWordLoading" class="font-body-md text-on-surface-variant dark:text-on-surface-variant italic">
+            Loading today's word…
+          </p>
+          <div *ngIf="!dailySafeWordLoading && dailySafeWord">
+            <div class="font-headline-lg text-headline-lg text-on-surface dark:text-on-surface mb-2 capitalize">
+              {{ dailySafeWord }}
+            </div>
+            <p *ngIf="dailySafeWordDefinition"
+               class="font-body-md text-on-surface-variant dark:text-on-surface-variant">
+              {{ dailySafeWordDefinition }}
+            </p>
+          </div>
+          <p *ngIf="!dailySafeWordLoading && !dailySafeWord && dailySafeWordError"
+             class="font-body-md text-on-surface-variant dark:text-on-surface-variant italic">
+            {{ dailySafeWordError }}
+          </p>
         </div>
 
         <!-- Parental Safety Advice -->

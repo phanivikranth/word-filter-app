@@ -1,0 +1,35 @@
+﻿============================================================
+Word: Feldenkrais
+Found: True | Source: encyclopedia
+Reason: Not in dictionary; summarized from encyclopedia (Wikipedia mirror)
+Summary:
+  The Feldenkrais Method is a type of exercise therapy devised by Israeli MoshΘ Feldenkrais (1904û1984) during the mid-20th century. The method is claimed to reorganize connections between the brain and body and so improve body movement and psychological state. There is no good medical evidence that the Feldenkrais method confers any health benefits.
+
+============================================================
+Word: scherenschnitte
+Found: True | Source: encyclopedia
+Reason: Not in dictionary; summarized from encyclopedia (Wikipedia mirror)
+.\venv\Scripts\python.exe : Traceback (most recent call last):
+At C:\Users\PKaja\AppData\Local\Temp\ps-script-d22fdf68-c932-4ab7-8cd0-9ff2d8343eb6.ps1:110 char:62
++ ... p\backend"; .\venv\Scripts\python.exe scripts\test_freedictionary.py  ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Traceback (most recent call last)::String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  File "C:\Users\PKaja\Documents\phani\word-filter-app\backend\scripts\test_freedictionary.py", line 41, in <module>
+    asyncio.run(main())
+  File "C:\Program Files\Python312\Lib\asyncio\runners.py", line 194, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "C:\Program Files\Python312\Lib\asyncio\runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\Python312\Lib\asyncio\base_events.py", line 687, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "C:\Users\PKaja\Documents\phani\word-filter-app\backend\scripts\test_freedictionary.py", line 36, in main
+    print(f"Summary:\n  {result['summary']}")
+  File "C:\Program Files\Python312\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode characters in position 103-104: character maps to <undefined>

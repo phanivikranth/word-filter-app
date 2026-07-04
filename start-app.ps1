@@ -35,18 +35,18 @@ if (Test-Path "backend\words.txt") {
 }
 
 Write-Host ""
-Write-Host "Starting Backend Server on port 8001..." -ForegroundColor Green
+Write-Host "Starting Backend Server on port 8000..." -ForegroundColor Green
 Write-Host "Starting Frontend Server on port 4200..." -ForegroundColor Green
 Write-Host ""
-Write-Host "Backend API: http://localhost:8001" -ForegroundColor Cyan
+Write-Host "Backend API: http://localhost:8000" -ForegroundColor Cyan
 Write-Host "Frontend App: http://localhost:4200" -ForegroundColor Cyan
-Write-Host "API Docs: http://localhost:8001/docs" -ForegroundColor Cyan
+Write-Host "API Docs: http://localhost:8000/docs" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Press Ctrl+C to stop both servers" -ForegroundColor Yellow
 Write-Host ""
 
 # Start backend in a new window
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$PWD\backend'; python main.py" -WindowStyle Normal
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$PWD\backend'; `$env:PORT='8000'; python main.py" -WindowStyle Normal
 
 # Start frontend in a new window  
 Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$PWD\frontend'; npm start" -WindowStyle Normal

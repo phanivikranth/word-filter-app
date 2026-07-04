@@ -5,7 +5,6 @@ import asyncio
 import aiohttp
 from typing import Dict, List, Optional, Tuple
 from concurrent.futures import ThreadPoolExecutor
-import time
 import re
 
 logger = logging.getLogger(__name__)
@@ -22,12 +21,17 @@ class OxfordValidator:
         self.session.headers.update({
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         })
-        self.executor = ThreadPoolExecutor(max_workers=3)  # Limit concurrent requests
+        self.executor = ThreadPoolExecutor(max_workers=30)
         self.cache = {}  # Simple in-memory cache
         self.cache_hits = 0
         self.cache_misses = 0
-        self.rate_limit_delay = 1  # 1 second between requests to be respectful
-        self.last_request_time = 0
+        
+    def set_concurrency(self, max_concurrent: int) -> None:
+        """Resize thread pool for parallel Oxford web lookups."""
+        workers = max(1, min(max_concurrent, 50))
+        if getattr(self.executor, "_max_workers", 0) != workers:
+            self.executor.shutdown(wait=False, cancel_futures=True)
+            self.executor = ThreadPoolExecutor(max_workers=workers)
         
     async def validate_word(self, word: str) -> Dict:
         """
@@ -45,15 +49,10 @@ class OxfordValidator:
         word = word.strip().lower()
         
         if not word or not word.isalpha():
-            return {
-                "word": word,
-                "is_valid": False,
-                "definitions": [],
-                "word_forms": [],
-                "examples": [],
-                "synonyms": [],
-                "reason": "Invalid word format (must contain only letters)"
-            }
+            return self._empty_word_result(
+                word,
+                reason="Invalid word format (must contain only letters)",
+            )
         
         # Check cache first
         if word in self.cache:
@@ -72,27 +71,69 @@ class OxfordValidator:
             
         except Exception as e:
             logger.error(f"Error validating word '{word}': {e}")
-            return {
-                "word": word,
-                "is_valid": False,
-                "definitions": [],
-                "word_forms": [],
-                "examples": [],
-                "synonyms": [],
-                "reason": f"Error during validation: {str(e)}"
-            }
+            return self._empty_word_result(
+                word,
+                reason=f"Error during validation: {str(e)}",
+            )
     
+    def _pronunciation_label(self, geo: str) -> str:
+        mapping = {"br": "BrE", "n_am": "NAmE", "us": "NAmE", "uk": "BrE"}
+        return mapping.get(geo, geo.upper() if geo else "Standard")
+
+    def _extract_pronunciations(self, soup: BeautifulSoup) -> List[Dict[str, str]]:
+        pronunciations: List[Dict[str, str]] = []
+        seen: set[tuple[str, str]] = set()
+
+        for block in soup.select("div.phons_br, div.phons_n_am, div[class*='phons_']"):
+            phon = block.select_one("span.phon")
+            if not phon:
+                continue
+            ipa = phon.get_text(strip=True).strip("/")
+            if not ipa:
+                continue
+
+            audio_el = block.select_one("[data-src-mp3], a.icon-audio, div.sound")
+            audio_url = ""
+            if audio_el:
+                audio_url = (
+                    audio_el.get("data-src-mp3")
+                    or audio_el.get("href")
+                    or ""
+                ).strip()
+                if audio_url.startswith("//"):
+                    audio_url = f"https:{audio_url}"
+
+            geo = block.get("geo") or ""
+            if not geo and block.get("class"):
+                for cls in block.get("class", []):
+                    if cls.startswith("phons_"):
+                        geo = cls.replace("phons_", "")
+                        break
+
+            prefix = self._pronunciation_label(str(geo))
+            key = (prefix, ipa)
+            if key in seen:
+                continue
+            seen.add(key)
+            pronunciations.append({"prefix": prefix, "ipa": ipa, "url": audio_url})
+
+        return pronunciations[:4]
+
+    def _empty_word_result(self, word: str, **kwargs) -> Dict:
+        base = {
+            "word": word,
+            "is_valid": False,
+            "definitions": [],
+            "word_forms": [],
+            "examples": [],
+            "synonyms": [],
+            "pronunciations": [],
+        }
+        base.update(kwargs)
+        return base
+
     def _fetch_word_sync(self, word: str) -> Dict:
         """Synchronous word fetching for use with ThreadPoolExecutor"""
-        
-        # Rate limiting
-        current_time = time.time()
-        time_since_last = current_time - self.last_request_time
-        if time_since_last < self.rate_limit_delay:
-            time.sleep(self.rate_limit_delay - time_since_last)
-        
-        self.last_request_time = time.time()
-        
         url = f"{self.base_url}{word}"
         
         try:
@@ -102,38 +143,23 @@ class OxfordValidator:
             if response.status_code == 200:
                 return self._parse_oxford_response(word, response.text)
             elif response.status_code == 404:
-                return {
-                    "word": word,
-                    "is_valid": False,
-                    "definitions": [],
-                    "word_forms": [],
-                    "examples": [],
-                    "synonyms": [],
-                    "reason": "Not found in Oxford Dictionary"
-                }
+                return self._empty_word_result(
+                    word,
+                    reason="Not found in Oxford Dictionary",
+                )
             else:
                 logger.warning(f"Unexpected status code {response.status_code} for word: {word}")
-                return {
-                    "word": word,
-                    "is_valid": False,
-                    "definitions": [],
-                    "word_forms": [],
-                    "examples": [],
-                    "synonyms": [],
-                    "reason": f"HTTP error: {response.status_code}"
-                }
+                return self._empty_word_result(
+                    word,
+                    reason=f"HTTP error: {response.status_code}",
+                )
                 
         except requests.exceptions.RequestException as e:
             logger.error(f"Request failed for word '{word}': {e}")
-            return {
-                "word": word,
-                "is_valid": False,
-                "definitions": [],
-                "word_forms": [],
-                "examples": [],
-                "synonyms": [],
-                "reason": f"Network error: {str(e)}"
-            }
+            return self._empty_word_result(
+                word,
+                reason=f"Network error: {str(e)}",
+            )
     
     def _parse_oxford_response(self, word: str, html_content: str) -> Dict:
         """Parse Oxford Dictionary HTML response"""
@@ -145,15 +171,12 @@ class OxfordValidator:
             definitions_section = soup.find('div', {'class': 'entry'})
             
             if not definitions_section:
-                return {
-                    "word": word,
-                    "is_valid": False,
-                    "definitions": [],
-                    "word_forms": [],
-                    "examples": [],
-                    "synonyms": [],
-                    "reason": "No definition section found"
-                }
+                return self._empty_word_result(
+                    word,
+                    reason="No definition section found",
+                )
+
+            pronunciations = self._extract_pronunciations(soup)
             
             # Extract definitions
             definitions = []
@@ -239,6 +262,8 @@ class OxfordValidator:
                 reason += f" and {len(examples)} example(s)"
             if synonyms:
                 reason += f" and {len(synonyms)} synonym(s)"
+            if pronunciations:
+                reason += f" and {len(pronunciations)} pronunciation(s)"
             
             return {
                 "word": word,
@@ -247,22 +272,18 @@ class OxfordValidator:
                 "word_forms": word_forms,
                 "examples": examples,
                 "synonyms": synonyms,
+                "pronunciations": pronunciations,
                 "reason": reason
             }
             
         except Exception as e:
             logger.error(f"Error parsing HTML for word '{word}': {e}")
-            return {
-                "word": word,
-                "is_valid": False,
-                "definitions": [],
-                "word_forms": [],
-                "examples": [],
-                "synonyms": [],
-                "reason": f"HTML parsing error: {str(e)}"
-            }
+            return self._empty_word_result(
+                word,
+                reason=f"HTML parsing error: {str(e)}",
+            )
     
-    async def validate_words_batch(self, words: List[str], max_concurrent: int = 3) -> Dict:
+    async def validate_words_batch(self, words: List[str], max_concurrent: int = 20) -> Dict:
         """
         Validate multiple words with concurrency control
         
@@ -281,39 +302,35 @@ class OxfordValidator:
                 "invalid_words": 0,
                 "results": []
             }
-        
-        logger.info(f"Validating {len(words)} words in batch")
-        
-        # Process words in chunks to avoid overwhelming the server
-        chunk_size = min(max_concurrent, 5)
-        results = []
-        
-        for i in range(0, len(words), chunk_size):
-            chunk = words[i:i + chunk_size]
-            
-            # Process chunk concurrently
-            tasks = [self.validate_word(word) for word in chunk]
-            chunk_results = await asyncio.gather(*tasks, return_exceptions=True)
-            
-            # Handle any exceptions
-            for j, result in enumerate(chunk_results):
-                if isinstance(result, Exception):
-                    logger.error(f"Exception validating word '{chunk[j]}': {result}")
-                    results.append({
-                        "word": chunk[j],
-                        "is_valid": False,
-                        "definitions": [],
-                        "word_forms": [],
-                        "examples": [],
-                        "synonyms": [],
-                        "reason": f"Exception: {str(result)}"
-                    })
-                else:
-                    results.append(result)
-            
-            # Small delay between chunks
-            if i + chunk_size < len(words):
-                await asyncio.sleep(0.5)
+
+        logger.info("Validating %s words (up to %s in parallel)", len(words), max_concurrent)
+        semaphore = asyncio.Semaphore(max(1, max_concurrent))
+
+        async def _validate_one(item: str) -> Dict:
+            async with semaphore:
+                return await self.validate_word(item)
+
+        chunk_results = await asyncio.gather(
+            *[_validate_one(word) for word in words],
+            return_exceptions=True,
+        )
+
+        results: List[Dict] = []
+        for index, result in enumerate(chunk_results):
+            if isinstance(result, Exception):
+                word = words[index]
+                logger.error("Exception validating word '%s': %s", word, result)
+                results.append({
+                    "word": word,
+                    "is_valid": False,
+                    "definitions": [],
+                    "word_forms": [],
+                    "examples": [],
+                    "synonyms": [],
+                    "reason": f"Exception: {str(result)}"
+                })
+            else:
+                results.append(result)
         
         # Calculate summary
         valid_count = sum(1 for r in results if r["is_valid"])

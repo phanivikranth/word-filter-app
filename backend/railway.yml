@@ -13,7 +13,7 @@ build:
 
 # Environment variables for Railway
 variables:
-  PORT: 8001
+  PORT: 8000
   ENVIRONMENT: production
   LOG_LEVEL: INFO
   PYTHONUNBUFFERED: "1"

@@ -6,6 +6,11 @@ from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime
 from pathlib import Path
 from oxford_validator import OxfordValidator
+from merriam_webster_validator import MerriamWebsterValidator
+from oxford_dictionaries_api_validator import OxfordDictionariesApiValidator
+from freedictionary_service import FreeDictionaryService
+from unified_word_lookup import UnifiedWordLookup
+from nhost_service import NhostWordService
 
 logger = logging.getLogger(__name__)
 
@@ -30,8 +35,20 @@ class WordManager:
         self.storage_type = "unknown"
         self.storage_info = {}
         
-        # Initialize Oxford validator
+        # Initialize dictionary validators
         self.oxford_validator = OxfordValidator()
+        self.merriam_webster_validator = MerriamWebsterValidator(
+            api_key=os.getenv("MERRIAM_WEBSTER_API_KEY")
+        )
+        self.oxford_dictionaries_api_validator = OxfordDictionariesApiValidator()
+        self.freedictionary_service = FreeDictionaryService()
+        self.unified_lookup = UnifiedWordLookup(
+            self.oxford_validator,
+            self.merriam_webster_validator,
+            self.oxford_dictionaries_api_validator,
+            self.freedictionary_service,
+        )
+        self.nhost_service = NhostWordService()
         
         # Initialize storage based on environment
         self._init_storage()
@@ -39,10 +56,16 @@ class WordManager:
     def _init_storage(self):
         """Initialize storage based on environment variables"""
         try:
+            storage_type = os.getenv("STORAGE_TYPE", "auto").lower()
+            use_nhost_storage = (
+                os.getenv("USE_NHOST", "false").lower() == "true"
+                and storage_type == "nhost"
+            )
             use_object_storage = os.getenv("USE_OBJECT_STORAGE", "false").lower() == "true"
-            storage_type = os.getenv("STORAGE_TYPE", "auto")
             
-            if use_object_storage or storage_type in ["civo", "s3"]:
+            if use_nhost_storage and self.nhost_service.is_configured():
+                self._init_nhost_storage()
+            elif use_object_storage or storage_type in ["civo", "s3"]:
                 self._init_object_store()
             else:
                 self._init_file_storage()
@@ -119,9 +142,27 @@ class WordManager:
         }
 
         logger.info(f"Initialized local file storage: {self.words_file_path}")
+
+    def _init_nhost_storage(self):
+        """Initialize Nhost PostgreSQL as primary word list storage."""
+        self.storage_type = "nhost"
+        self.storage_info = {
+            "provider": "nhost",
+            "type": "nhost",
+            "connected": self.nhost_service.is_configured(),
+            "nhost": self.nhost_service.get_status(),
+        }
+        logger.info("Initialized Nhost storage for word list")
     
     async def load_words(self) -> List[str]:
         """Load words from either object store or local file based on current mode"""
+        if self.storage_type == "nhost" and self.nhost_service.is_configured():
+            try:
+                return await self.load_words_from_nhost()
+            except Exception as e:
+                logger.error(f"Failed to load from Nhost, falling back to file: {e}")
+                self._init_file_storage()
+
         if self.storage_type == "object_store" and self.s3_client:
             try:
                 return await self.load_words_from_object_store()
@@ -130,6 +171,14 @@ class WordManager:
                 self._init_file_storage()
         
         return await self.load_words_from_file()
+
+    async def load_words_from_nhost(self) -> List[str]:
+        """Load word keys from Nhost Postgres."""
+        words = await self.nhost_service.load_all_words()
+        self.words_list = words
+        self.words_set = set(words)
+        logger.info(f"Loaded {len(words)} words from Nhost")
+        return words
 
     async def load_words_from_object_store(self) -> List[str]:
         """Load words from Object Store"""
@@ -511,8 +560,8 @@ class WordManager:
     # Oxford Dictionary Integration Methods
     
     async def validate_word_with_oxford(self, word: str) -> Dict:
-        """Validate a word using Oxford Dictionary API"""
-        return await self.oxford_validator.validate_word(word)
+        """Validate a word using combined dictionary sources"""
+        return await self.unified_lookup.lookup_word(word)
     
     async def add_word_with_validation(self, word: str, skip_oxford: bool = False) -> Dict:
         """Add a word with Oxford Dictionary validation"""
@@ -539,15 +588,16 @@ class WordManager:
         # Validate with Oxford Dictionary if requested
         oxford_result = None
         if not skip_oxford:
-            oxford_result = await self.oxford_validator.validate_word(word)
-            if not oxford_result["is_valid"]:
+            validation_result = await self.unified_lookup.lookup_word(word)
+            if not validation_result["is_valid"]:
                 return {
                     "success": False,
                     "word": word,
                     "was_new": False,
-                    "oxford_validation": oxford_result,
-                    "message": f"Word '{word}' not found in Oxford Dictionary: {oxford_result['reason']}"
+                    "oxford_validation": validation_result,
+                    "message": f"Word '{word}' not found in dictionary sources: {validation_result['reason']}"
                 }
+            oxford_result = validation_result
         
         # Add to collection
         success = await self.add_word(word)
@@ -578,7 +628,7 @@ class WordManager:
         
         for i in range(0, len(words_list), batch_size):
             batch = words_list[i:i + batch_size]
-            batch_result = await self.oxford_validator.validate_words_batch(batch)
+            batch_result = await self.unified_lookup.validate_words_batch(batch)
             all_results.extend(batch_result["results"])
             
             for result in batch_result["results"]:
@@ -625,5 +675,5 @@ class WordManager:
         }
     
     async def get_oxford_cache_stats(self) -> Dict:
-        """Get Oxford validator cache statistics"""
-        return self.oxford_validator.get_cache_stats()
+        """Get dictionary validator cache statistics"""
+        return self.unified_lookup.get_dictionary_stats()

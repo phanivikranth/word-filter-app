@@ -2,6 +2,22 @@
 .env
 .env.local
 .env.*.local
+backend/.env
+backend/mw_api_usage.json
+backend/oxford_dictionaries_api_usage.json
+
+# Secrets / local credentials (never commit)
+nhost-details.txt
+nhost-details.json
+
+# Generated word lists and validation outputs
+backend/valid_words.txt
+backend/invalid_words.txt
+backend/invalid_words_invalid.txt
+backend/invalid_words_valid.txt
+backend/validation_checkpoint.json
+backend/validation_checkpoint_*.json
+words_year.txt
 
 # Python
 __pycache__/
@@ -61,3 +77,7 @@ backend/check_words.py
 # OS
 Thumbs.db
 .DS_Store
+
+#nhost
+backend/.nhost/
+nhost-details.json

@@ -2,23 +2,14 @@
 Write-Host "Starting Backend Server..." -ForegroundColor Green
 cd backend
 
-# Activate virtual environment if it exists
-if (Test-Path "venv\Scripts\activate.ps1") {
-    Write-Host "Activating virtual environment..." -ForegroundColor Yellow
-    & .\venv\Scripts\activate.ps1
+# Create venv with Python 3.12 if missing
+if (-not (Test-Path "venv\Scripts\python.exe")) {
+    Write-Host "Creating Python 3.12 virtual environment..." -ForegroundColor Yellow
+    py -3.12 -m venv venv
+    & .\venv\Scripts\pip.exe install -r requirements.txt
 }
 
-# Check if FastAPI is installed
-try {
-    python -c "import fastapi" 2>&1 | Out-Null
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "FastAPI not found. Installing dependencies..." -ForegroundColor Yellow
-        pip install -r requirements.txt
-    }
-} catch {
-    Write-Host "Installing dependencies..." -ForegroundColor Yellow
-    pip install -r requirements.txt
-}
+$python = ".\venv\Scripts\python.exe"
 
 # Ensure words.txt exists before starting the server
 if (-not (Test-Path "words.txt") -and (Test-Path "google-10k-common.txt")) {
@@ -26,8 +17,9 @@ if (-not (Test-Path "words.txt") -and (Test-Path "google-10k-common.txt")) {
     Copy-Item "google-10k-common.txt" "words.txt"
 }
 
-Write-Host "Starting server on http://localhost:8001" -ForegroundColor Cyan
-python main.py
+$env:PORT = "8000"
+Write-Host "Starting server on http://localhost:8000" -ForegroundColor Cyan
+& $python main.py
 Write-Host "Backend server stopped." -ForegroundColor Red
 pause
 

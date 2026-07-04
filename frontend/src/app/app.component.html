@@ -179,10 +179,11 @@
                 </span>
               </div>
               <div>
-                <h3 class="font-headline-lg text-on-surface dark:text-on-surface flex items-center gap-2">
+                <h3 class="font-headline-lg text-on-surface dark:text-on-surface flex items-center gap-2 flex-wrap">
                   {{ searchResult.word | titlecase }}
-                  <span *ngIf="searchResult.oxford && searchResult.oxford.pronunciations && searchResult.oxford.pronunciations.length > 0" class="text-body-md text-outline font-normal">
-                    /{{ searchResult.oxford.pronunciations[0].ipa }}/
+                  <span *ngIf="searchResult.oxford?.pronunciations?.length"
+                        class="text-body-md text-outline font-normal">
+                    /{{ searchResult.oxford!.pronunciations![0].ipa }}/
                   </span>
                 </h3>
                 <div class="flex gap-2 mt-1">
@@ -216,6 +217,30 @@
             </p>
           </div>
 
+          <!-- Pronunciation -->
+          <div *ngIf="searchResult.oxford?.pronunciations?.length"
+               class="bg-surface-container dark:bg-on-secondary-fixed/50 p-4 rounded-xl border border-surface-variant dark:border-outline">
+            <h4 class="font-label-md text-label-md text-on-surface dark:text-on-surface mb-3 flex items-center gap-2">
+              <span class="material-symbols-rounded text-primary">record_voice_over</span>
+              Pronunciation
+            </h4>
+            <div class="flex flex-col gap-2">
+              <div *ngFor="let pron of searchResult.oxford!.pronunciations!"
+                   class="flex flex-wrap items-center gap-3 py-2 border-b border-surface-variant/50 last:border-0">
+                <span class="px-2 py-0.5 rounded-full bg-primary-container text-on-primary-fixed-variant font-label-sm text-label-sm">
+                  {{ pron.prefix || 'Standard' }}
+                </span>
+                <span class="font-body-lg text-on-surface tracking-wide">/{{ pron.ipa }}/</span>
+                <button type="button"
+                        class="w-10 h-10 rounded-full bg-primary/10 hover:bg-primary/20 flex items-center justify-center transition-colors"
+                        [title]="pron.url ? 'Play audio' : 'Speak word'"
+                        (click)="playPronunciation(pron.url, searchResult.word)">
+                  <span class="material-symbols-rounded text-primary icon-filled">volume_up</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
           <!-- Oxford Definitions block -->
           <div *ngIf="searchResult.oxford && searchResult.oxford.definitions && searchResult.oxford.definitions.length > 0">
             <h4 class="font-label-md text-on-surface dark:text-on-surface mb-2 flex items-center gap-1.5">
@@ -236,18 +261,6 @@
             <ul class="space-y-2 pl-4 text-body-md italic text-outline">
               <li *ngFor="let ex of searchResult.oxford.examples">"{{ ex }}"</li>
             </ul>
-          </div>
-
-          <!-- Pronunciations audio file player -->
-          <div *ngIf="searchResult.oxford && searchResult.oxford.pronunciations && searchResult.oxford.pronunciations.length > 0" class="flex flex-wrap gap-2">
-            <ng-container *ngFor="let pron of searchResult.oxford.pronunciations">
-              <button *ngIf="pron.url" 
-                      class="px-4 py-2 bg-surface-container hover:bg-surface-container-high rounded-xl flex items-center gap-2 border border-surface-variant transition-colors"
-                      (click)="playPronunciation(pron.url)">
-                <span class="material-symbols-rounded text-primary icon-filled">volume_up</span>
-                <span class="font-label-md text-label-md text-on-surface">{{ pron.prefix || 'IPA' }} ({{ pron.ipa }})</span>
-              </button>
-            </ng-container>
           </div>
 
           <!-- Synonym Chips -->

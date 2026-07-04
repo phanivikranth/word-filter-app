@@ -6,7 +6,7 @@ import json
 
 def test_synonym_endpoint(word="happy"):
     """Test the /words/validate endpoint with synonyms"""
-    url = "http://localhost:8001/words/validate"
+    url = "http://localhost:8000/words/validate"
     
     print(f"\n{'='*60}")
     print(f"Testing Synonym Integration for word: '{word}'")
@@ -69,7 +69,7 @@ def test_synonym_endpoint(word="happy"):
             return False
             
     except requests.exceptions.ConnectionError:
-        print("❌ Error: Could not connect to backend at http://localhost:8001")
+        print("❌ Error: Could not connect to backend at http://localhost:8000")
         print("   Make sure the backend is running!")
         return False
     except Exception as e:

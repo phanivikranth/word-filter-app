@@ -935,7 +935,7 @@ export class AppComponent implements OnInit, OnDestroy {
       },
       error: (err) => {
         console.error('Error loading performance stats:', err);
-        this.telemetryError = 'Failed to retrieve performance metrics. Please verify the backend service is running on port 8001.';
+        this.telemetryError = 'Failed to retrieve performance metrics. Please verify the backend service is running on port 8000.';
         this.telemetryLoading = false;
       }
     });
@@ -1159,13 +1159,30 @@ export class AppComponent implements OnInit, OnDestroy {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  playPronunciation(audioUrl: string) {
+  playPronunciation(audioUrl?: string, word?: string) {
     if (audioUrl) {
       const audio = new Audio(audioUrl);
-      audio.play().catch(error => {
-        console.error('Error playing pronunciation:', error);
+      audio.play().catch(() => {
+        if (word) {
+          this.speakWord(word);
+        }
       });
+      return;
     }
+    if (word) {
+      this.speakWord(word);
+    }
+  }
+
+  speakWord(word: string) {
+    if (!word || typeof window === 'undefined' || !window.speechSynthesis) {
+      return;
+    }
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(word);
+    utterance.lang = 'en-US';
+    utterance.rate = 0.9;
+    window.speechSynthesis.speak(utterance);
   }
 
   trackByIndex(index: number, item: any): number { return index; }

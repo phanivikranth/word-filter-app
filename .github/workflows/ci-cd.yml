@@ -225,7 +225,7 @@ jobs:
     services:
       backend:
         image: python:3.12-slim
-        options: --health-cmd "curl -f http://localhost:8001/health || exit 1" --health-interval 30s --health-timeout 10s --health-retries 3
+        options: --health-cmd "curl -f http://localhost:8000/health || exit 1" --health-interval 30s --health-timeout 10s --health-retries 3
         
     steps:
     - name: Checkout code
@@ -247,8 +247,8 @@ jobs:
         
     - name: Test backend health
       run: |
-        curl -f http://localhost:8001/ || exit 1
-        curl -f http://localhost:8001/words/stats || exit 1
+        curl -f http://localhost:8000/ || exit 1
+        curl -f http://localhost:8000/words/stats || exit 1
         
     - name: Set up Node.js
       uses: actions/setup-node@v4

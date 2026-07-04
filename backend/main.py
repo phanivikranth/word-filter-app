@@ -13,8 +13,14 @@ from pydantic import BaseModel
 from dotenv import load_dotenv
 
 from oxford_validator import OxfordValidator
+from merriam_webster_validator import MerriamWebsterValidator
+from oxford_dictionaries_api_validator import OxfordDictionariesApiValidator
+from combined_word_validator import CombinedWordValidator
+from freedictionary_service import FreeDictionaryService
+from unified_word_lookup import UnifiedWordLookup
 from synonym_service import get_synonym_service
 from word_manager import WordManager
+from nhost_service import NhostWordService
 from puzzle_solver import match_pattern as advanced_match_pattern, match_regex, match_anagram
 
 # Import logging configuration
@@ -61,6 +67,9 @@ class RemoveWordsReq(BaseModel):
 
 class CleanupReq(BaseModel):
     auto_remove: bool = False
+
+class FreeDictionaryLookupRequest(BaseModel):
+    word: str
 
 app = FastAPI(
     title="Word Filter API - Unified", 
@@ -154,7 +163,22 @@ app.add_middleware(
 
 # Global storage and validation instances
 word_manager = WordManager()
+nhost_service = NhostWordService()
 oxford_validator = OxfordValidator()
+merriam_webster_validator = MerriamWebsterValidator(api_key=os.getenv("MERRIAM_WEBSTER_API_KEY"))
+oxford_dictionaries_api_validator = OxfordDictionariesApiValidator()
+combined_validator = CombinedWordValidator(
+    oxford_validator,
+    merriam_webster_validator,
+    oxford_dictionaries_api_validator,
+)
+freedictionary_service = FreeDictionaryService()
+unified_lookup = UnifiedWordLookup(
+    oxford_validator,
+    merriam_webster_validator,
+    oxford_dictionaries_api_validator,
+    freedictionary_service,
+)
 
 # Global variables to store words (for fast/optimized concurrent filtering read paths)
 words_list = []
@@ -562,31 +586,59 @@ async def get_performance_stats():
 
 # OXFORD DICTIONARY & SYNONYM ENDPOINTS
 
+async def _enrich_synonyms(word: str, oxford_data: dict) -> dict:
+    return await synonym_service.get_synonyms_combined(word, oxford_data, max_results=15)
+
 @app.post("/words/validate")
 async def validate_word(request: ValidateWordRequest):
-    """Validate a word using Oxford Dictionary and fetch synonyms from multiple sources"""
+    """Unified word lookup across all dictionary sources (UI-stable response)."""
     try:
         word = request.word.strip()
         if not word:
             raise HTTPException(status_code=400, detail="Word cannot be empty")
         if not word.isalpha():
             raise HTTPException(status_code=400, detail="Word must contain only letters")
-        
-        validation_result = await oxford_validator.validate_word(word)
-        synonym_data = await synonym_service.get_synonyms_combined(word, validation_result, max_results=15)
-        
-        validation_result['synonyms'] = synonym_data['synonyms']
-        validation_result['synonym_sources'] = synonym_data['sources']
-        
-        if synonym_data['count'] > 0:
-            if 'synonym' not in validation_result['reason']:
-                validation_result['reason'] += f" and {synonym_data['count']} synonym(s) from multiple sources"
-        
+
+        lookup_result: dict = {}
+        if request.skip_oxford:
+            validation_result = unified_lookup.to_ui_validation({
+                "word": word.lower(),
+                "is_valid": True,
+                "definitions": [],
+                "word_forms": [],
+                "examples": [],
+                "synonyms": [],
+                "reason": "Dictionary validation skipped",
+                "validation_source": "skipped",
+            })
+        else:
+            if nhost_service.is_configured() and nhost_service.use_cache_on_lookup:
+                cached = await nhost_service.lookup_word(word.lower())
+                if cached and cached.get("definitions"):
+                    lookup_result = cached
+                    validation_result = unified_lookup.to_ui_validation(cached)
+                else:
+                    lookup_result = await unified_lookup.lookup_word(
+                        word, enrich_synonyms=_enrich_synonyms
+                    )
+                    validation_result = unified_lookup.to_ui_validation(lookup_result)
+            else:
+                lookup_result = await unified_lookup.lookup_word(
+                    word, enrich_synonyms=_enrich_synonyms
+                )
+                validation_result = unified_lookup.to_ui_validation(lookup_result)
+
+            if lookup_result.get("synonym_sources"):
+                validation_result["synonym_sources"] = lookup_result["synonym_sources"]
+
         return {
             "success": True,
             "word": word.lower(),
             "oxford_validation": validation_result,
-            "message": f"Validation complete for '{word}'"
+            "unified_validation": validation_result,
+            "validation_source": validation_result.get("validation_source"),
+            "source_details": lookup_result.get("source_details") if not request.skip_oxford else {},
+            "message": f"Validation complete for '{word}'",
         }
     except HTTPException:
         raise
@@ -594,21 +646,36 @@ async def validate_word(request: ValidateWordRequest):
         logger.error(f"Error validating word: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
+@app.get("/words/lookup")
+async def unified_word_lookup_get(word: str = Query(..., min_length=1)):
+    """Unified dictionary lookup (GET). Same logic as /words/validate."""
+    request = ValidateWordRequest(word=word, skip_oxford=False)
+    return await validate_word(request)
+
+@app.post("/words/lookup")
+async def unified_word_lookup_post(request: ValidateWordRequest):
+    """Unified dictionary lookup (POST). Same logic as /words/validate."""
+    return await validate_word(request)
+
 @app.get("/words/search-basic")
 async def search_basic_word(word: str):
-    """Search for a word in our collection and Oxford Dictionary"""
+    """Search for a word in our collection and all dictionary sources."""
     try:
         word_lower = word.strip().lower()
         if not word_lower or not word_lower.isalpha():
             raise HTTPException(status_code=400, detail="Word must contain only letters")
-        
+
         in_collection = word_lower in words_set
-        oxford_result = await oxford_validator.validate_word(word_lower)
-        
+        lookup_result = await unified_lookup.lookup_word(
+            word_lower, enrich_synonyms=_enrich_synonyms
+        )
+        ui_result = unified_lookup.to_ui_validation(lookup_result)
+
+        # Always return a stable object so the UI never breaks on null.
         return BasicSearchResult(
             word=word_lower,
             inCollection=in_collection,
-            oxford=oxford_result if oxford_result["is_valid"] else None
+            oxford=ui_result,
         )
     except HTTPException:
         raise
@@ -637,11 +704,11 @@ async def add_word_with_validation(request: ValidateWordRequest):
             )
         
         if not request.skip_oxford:
-            oxford_result = await oxford_validator.validate_word(word)
-            if not oxford_result["is_valid"]:
+            lookup_result = await unified_lookup.lookup_word(word)
+            if not lookup_result["is_valid"]:
                 return AddWordResponse(
                     success=False,
-                    message=f"Word '{word}' not found in Oxford Dictionary: {oxford_result['reason']}",
+                    message=f"Word '{word}' not found in dictionary sources: {lookup_result['reason']}",
                     word=word,
                     was_new=False,
                     total_words=len(words_list)
@@ -881,7 +948,8 @@ async def get_storage_info():
         storage_info = await word_manager.get_storage_info()
         return {
             "success": True,
-            "storage_info": storage_info
+            "storage_info": storage_info,
+            "nhost": nhost_service.get_status(),
         }
     except Exception as e:
         logger.error(f"Error getting storage info: {e}")
@@ -962,6 +1030,52 @@ async def get_oxford_cache_statistics():
         logger.error(f"Error getting Oxford stats: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
+@app.get("/words/dictionary-stats")
+async def get_dictionary_statistics():
+    """Get combined dictionary API usage (Merriam-Webster quota + Oxford cache)"""
+    try:
+        stats = unified_lookup.get_dictionary_stats()
+        stats["freedictionary"] = freedictionary_service.get_cache_stats()
+        return {
+            "success": True,
+            "dictionary_stats": stats,
+            "message": "Dictionary API statistics retrieved"
+        }
+    except Exception as e:
+        logger.error(f"Error getting dictionary stats: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@app.get("/words/freedictionary")
+async def lookup_freedictionary_word(word: str = Query(..., min_length=1)):
+    """Look up a word on TheFreeDictionary (dictionary, with encyclopedia fallback)."""
+    try:
+        clean = word.strip()
+        if not clean:
+            raise HTTPException(status_code=400, detail="Word cannot be empty")
+        result = await freedictionary_service.lookup_word(clean)
+        return {"success": True, **result}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"FreeDictionary lookup failed for '{word}': {e}")
+        raise HTTPException(status_code=500, detail="FreeDictionary lookup failed")
+
+@app.post("/words/freedictionary")
+async def lookup_freedictionary_word_post(request: FreeDictionaryLookupRequest):
+    """Look up a word on TheFreeDictionary (POST body: {\"word\": \"...\"})."""
+    try:
+        clean = request.word.strip()
+        if not clean:
+            raise HTTPException(status_code=400, detail="Word cannot be empty")
+        result = await freedictionary_service.lookup_word(clean)
+        return {"success": True, **result}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"FreeDictionary lookup failed for '{request.word}': {e}")
+        raise HTTPException(status_code=500, detail="FreeDictionary lookup failed")
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+    port = int(os.getenv("PORT", "8000"))
+    uvicorn.run(app, host="0.0.0.0", port=port)

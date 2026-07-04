@@ -533,29 +533,28 @@ describe('AppComponent', () => {
       expect(mockAudio.play).toHaveBeenCalled();
     });
 
-    it('should handle pronunciation play error', async () => {
+    it('should handle pronunciation play error with speech fallback', async () => {
       const mockAudio = jasmine.createSpyObj('HTMLAudioElement', ['play']);
       mockAudio.play.and.returnValue(Promise.reject(new Error('Audio error')));
       spyOn(window, 'Audio').and.returnValue(mockAudio);
-      spyOn(console, 'error');
+      spyOn(component, 'speakWord');
 
-      component.playPronunciation('https://example.com/audio.mp3');
+      component.playPronunciation('https://example.com/audio.mp3', 'hello');
 
       expect(window.Audio).toHaveBeenCalledWith('https://example.com/audio.mp3');
       expect(mockAudio.play).toHaveBeenCalled();
-      
-      // Wait for the async error handling to complete
       await new Promise(resolve => setTimeout(resolve, 10));
-      
-      expect(console.error).toHaveBeenCalledWith('Error playing pronunciation:', jasmine.any(Error));
+      expect(component.speakWord).toHaveBeenCalledWith('hello');
     });
 
-    it('should not play pronunciation without URL', () => {
+    it('should speak word when no audio url is provided', () => {
       spyOn(window, 'Audio');
+      spyOn(component, 'speakWord');
 
-      component.playPronunciation('');
+      component.playPronunciation('', 'hello');
 
       expect(window.Audio).not.toHaveBeenCalled();
+      expect(component.speakWord).toHaveBeenCalledWith('hello');
     });
   });
 

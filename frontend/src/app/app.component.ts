@@ -3,6 +3,7 @@ import { FormBuilder, FormGroup } from '@angular/forms';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { WordService, BasicSearchResult, OxfordValidation } from './services/word.service';
 import { WordFilter, WordStats } from './models/word.model';
+import { withWordIcons } from './core/utils/word-icon.util';
 import { Subscription, interval } from 'rxjs';
 
 @Component({
@@ -27,8 +28,15 @@ export class AppComponent implements OnInit, OnDestroy {
   isSearching = false;
   searchError = '';
 
-  /** Quick suggestions for standard search */
-  quickSuggestions = [
+  /** Quick suggestions — populated daily from DataMuse */
+  quickSuggestions: { word: string; icon: string }[] = [];
+  safeExploreLoading = false;
+  safeExploreError = '';
+  private readonly safeExploreIcons = [
+    'handshake', 'nutrition', 'share', 'support', 'favorite',
+    'volunteer_activism', 'park', 'spa', 'psychology', 'shield',
+  ];
+  private readonly safeExploreFallback = [
     { word: 'friendly', icon: 'handshake' },
     { word: 'apple', icon: 'nutrition' },
     { word: 'share', icon: 'share' },
@@ -38,7 +46,7 @@ export class AppComponent implements OnInit, OnDestroy {
     { word: 'nature', icon: 'park' },
     { word: 'gentle', icon: 'spa' },
     { word: 'empathy', icon: 'psychology' },
-    { word: 'courage', icon: 'shield' }
+    { word: 'courage', icon: 'shield' },
   ];
 
   /** Advanced filter properties */
@@ -46,6 +54,8 @@ export class AppComponent implements OnInit, OnDestroy {
   words: string[] = [];
   loading = false;
   error = '';
+  advancedFilterSource = '';
+  advancedFilterMode: 'browse' | 'filter' = 'browse';
 
   /** Advanced Puzzle Solver properties */
   puzzleLength: number | null = 5;
@@ -130,12 +140,15 @@ export class AppComponent implements OnInit, OnDestroy {
   dailyScrambleLoading = false;
   dailyScrambleError = '';
 
-  // Weekly Word Section
-  weeklyWords = [
-    { word: 'terse', definition: 'sparing in the use of words; abrupt.', icon: 'auto_stories' },
+  // Daily Word Challenge (DataMuse education-topic words)
+  dailyWordChallenge: { word: string; definition: string; icon: string }[] = [];
+  dailyWordChallengeLoading = false;
+  dailyWordChallengeError = '';
+  private readonly dailyWordChallengeFallback = [
+    { word: 'terse', definition: 'sparing in the use of words; abrupt.', icon: 'edit_note' },
     { word: 'luminous', definition: 'full of or shedding light; bright or shining.', icon: 'emoji_objects' },
-    { word: 'resilient', definition: 'able to withstand or recover quickly from difficult conditions.', icon: 'school' },
-    { word: 'ephemeral', definition: 'lasting for a very short time.', icon: 'local_library' }
+    { word: 'resilient', definition: 'able to withstand or recover quickly from difficult conditions.', icon: 'fitness_center' },
+    { word: 'ephemeral', definition: 'lasting for a very short time.', icon: 'hourglass_empty' },
   ];
 
   dailySafeWord = '';
@@ -194,10 +207,11 @@ export class AppComponent implements OnInit, OnDestroy {
     }
 
     this.loadWordStats();
-    this.searchWords(); 
     this.onPuzzleLengthChange();
     this.loadDailySafeWord();
     this.loadDailyScramble();
+    this.loadDailySafeExplore();
+    this.loadDailyWordChallenge();
 
     // Setup periodic metrics update and simulated edge worker logs
     this.statsIntervalSubscription = interval(10000).subscribe(() => {
@@ -258,6 +272,87 @@ export class AppComponent implements OnInit, OnDestroy {
   // ==========================================
   // VIEW MODE CHANGERS
   // ==========================================
+
+  loadDailyWordChallenge(): void {
+    const today = new Date().toISOString().slice(0, 10);
+    const cachedDate = localStorage.getItem('dailyWordChallengeDate');
+    const cachedItems = localStorage.getItem('dailyWordChallengeItems');
+
+    if (cachedDate === today && cachedItems) {
+      try {
+        this.dailyWordChallenge = JSON.parse(cachedItems);
+        return;
+      } catch {
+        localStorage.removeItem('dailyWordChallengeItems');
+      }
+    }
+
+    this.dailyWordChallengeLoading = true;
+    this.dailyWordChallengeError = '';
+    this.wordService.getDailyWordChallenge().subscribe({
+      next: (res) => {
+        this.dailyWordChallengeLoading = false;
+        if (res.success && res.items?.length) {
+          this.dailyWordChallenge = withWordIcons(res.items);
+          localStorage.setItem('dailyWordChallengeDate', today);
+          localStorage.setItem(
+            'dailyWordChallengeItems',
+            JSON.stringify(this.dailyWordChallenge)
+          );
+        } else {
+          this.dailyWordChallenge = [...this.dailyWordChallengeFallback];
+          this.dailyWordChallengeError = 'Could not load today\'s word challenge.';
+        }
+      },
+      error: () => {
+        this.dailyWordChallengeLoading = false;
+        this.dailyWordChallenge = [...this.dailyWordChallengeFallback];
+        this.dailyWordChallengeError = 'Word challenge unavailable. Using defaults.';
+      },
+    });
+  }
+
+  loadDailySafeExplore(): void {
+    const today = new Date().toISOString().slice(0, 10);
+    const cachedDate = localStorage.getItem('dailySafeExploreDate');
+    const cachedWords = localStorage.getItem('dailySafeExploreWords');
+
+    if (cachedDate === today && cachedWords) {
+      try {
+        this.quickSuggestions = JSON.parse(cachedWords);
+        return;
+      } catch {
+        localStorage.removeItem('dailySafeExploreWords');
+      }
+    }
+
+    this.safeExploreLoading = true;
+    this.safeExploreError = '';
+    this.wordService.getDailySafeExplore().subscribe({
+      next: (res) => {
+        this.safeExploreLoading = false;
+        if (res.success && res.words?.length) {
+          this.quickSuggestions = res.words.map((word, index) => ({
+            word,
+            icon: this.safeExploreIcons[index % this.safeExploreIcons.length],
+          }));
+          localStorage.setItem('dailySafeExploreDate', today);
+          localStorage.setItem(
+            'dailySafeExploreWords',
+            JSON.stringify(this.quickSuggestions)
+          );
+        } else {
+          this.quickSuggestions = [...this.safeExploreFallback];
+          this.safeExploreError = 'Could not load today\'s explore words.';
+        }
+      },
+      error: () => {
+        this.safeExploreLoading = false;
+        this.quickSuggestions = [...this.safeExploreFallback];
+        this.safeExploreError = 'Explore words unavailable. Using defaults.';
+      },
+    });
+  }
 
   loadDailyScramble(): void {
     const today = new Date().toISOString().slice(0, 10);
@@ -323,6 +418,8 @@ export class AppComponent implements OnInit, OnDestroy {
       if (!this.wordleActive && !this.anagramActive) {
         this.startWordleGame();
       }
+    } else if (mode === 'advanced') {
+      this.searchWords();
     }
   }
 
@@ -383,25 +480,28 @@ export class AppComponent implements OnInit, OnDestroy {
   searchWords() {
     this.loading = true;
     this.error = '';
+    this.advancedFilterSource = '';
     
     const filterValues = this.filterForm.value;
-    const filter: WordFilter = {};
+    const filter: WordFilter = { limit: filterValues.limit || 100 };
 
     Object.keys(filterValues).forEach(key => {
       const value = filterValues[key];
-      if (value !== null && value !== '' && value !== undefined) {
+      if (value !== null && value !== '' && value !== undefined && key !== 'limit') {
         filter[key as keyof WordFilter] = value;
       }
     });
 
-    this.wordService.getFilteredWords(filter).subscribe({
-      next: (words) => {
-        this.words = words;
+    this.wordService.getAdvancedFilteredWords(filter).subscribe({
+      next: (response) => {
+        this.words = response.words || [];
+        this.advancedFilterSource = response.source || '';
+        this.advancedFilterMode = response.mode === 'filter' ? 'filter' : 'browse';
         this.loading = false;
       },
       error: (error) => {
         console.error('Error searching words:', error);
-        this.error = 'Failed to search words. Make sure the backend is running.';
+        this.error = error?.error?.detail || 'Failed to search words. Make sure the backend is running.';
         this.loading = false;
       }
     });

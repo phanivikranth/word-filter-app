@@ -1,23 +1,33 @@
-# Backend Dockerfile for FastAPI
+# Production Dockerfile for FastAPI backend (Render / Docker)
 FROM python:3.11-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PORT=8000
 
 WORKDIR /app
 
-# Copy requirements first for better Docker layer caching
+# Install dependencies first for better layer caching
 COPY requirements.txt .
+RUN pip install --upgrade pip && \
+    pip install -r requirements.txt
 
-# Install Python dependencies
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
-
-# Copy application code
+# Application code (words.txt bundled for file-based fallback)
 COPY . .
 
-ENV PORT=8000
+# Writable cache dir for daily puzzles / DataMuse caches (ephemeral on free tier)
+RUN mkdir -p /app/data /app/logs && \
+    adduser --disabled-password --gecos "" --uid 1000 appuser && \
+    chown -R appuser:appuser /app
+
+USER appuser
+
 EXPOSE 8000
 
-HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD python -c "import os,requests; requests.get(f'http://localhost:{os.environ.get(\"PORT\",8000)}/health')" || exit 1
+# Render injects PORT at runtime; allow slow cold starts while word list loads
+HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
+    CMD python -c "import os, urllib.request; urllib.request.urlopen(f'http://127.0.0.1:{os.environ.get(\"PORT\", \"8000\")}/health', timeout=8)" || exit 1
 
-# Run the application
-CMD ["python", "main.py"]
+CMD ["sh", "-c", "exec uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000} --proxy-headers --forwarded-allow-ips='*'"]

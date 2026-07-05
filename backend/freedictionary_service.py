@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import random
 import re
 import threading
@@ -32,12 +33,17 @@ DEFAULT_HEADERS = {
     ),
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     "Accept-Language": "en-US,en;q=0.9",
+    "Referer": "https://www.thefreedictionary.com/",
 }
 
 NOT_IN_DICTIONARY_MARKERS = (
     "is not available in the general english dictionary",
     "word not found in the dictionary and encyclopedia",
 )
+
+
+class FreeDictionaryBlockedError(RuntimeError):
+    """Raised when TheFreeDictionary returns repeated 403/429 blocks."""
 
 
 class FreeDictionaryService:
@@ -51,7 +57,27 @@ class FreeDictionaryService:
         self.request_delay = max(0.0, request_delay)
         self._rate_lock = threading.Lock()
         self._last_request_time = 0.0
-        self._blocked_backoff = 60.0
+        self._blocked_backoff = float(
+            os.getenv("FREEDICTIONARY_BLOCKED_BACKOFF", "15")
+        )
+        self._max_blocked_retries = int(
+            os.getenv("FREEDICTIONARY_BLOCKED_RETRIES", "2")
+        )
+        self._last_fetch_blocked = False
+        self.consecutive_blocked_fetches = 0
+        self.blocked_pause_after = int(
+            os.getenv("FREEDICTIONARY_BLOCKED_PAUSE_AFTER", "3")
+        )
+
+    def set_blocked_backoff(self, seconds: float) -> None:
+        self._blocked_backoff = max(1.0, seconds)
+
+    def set_blocked_pause_after(self, count: int) -> None:
+        self.blocked_pause_after = max(1, count)
+
+    def reset_blocked_counter(self) -> None:
+        self.consecutive_blocked_fetches = 0
+        self._last_fetch_blocked = False
 
     def set_request_delay(self, seconds: float) -> None:
         self.request_delay = max(0.0, seconds)
@@ -74,36 +100,53 @@ class FreeDictionaryService:
                 time.sleep(wait)
             self._last_request_time = time.time()
 
-    def _fetch_html(self, url: str, *, max_retries: int = 3) -> Optional[str]:
-        for attempt in range(max_retries):
+    def _fetch_html(self, url: str, *, max_retries: int | None = None) -> Optional[str]:
+        retries = max_retries if max_retries is not None else self._max_blocked_retries
+        self._last_fetch_blocked = False
+        for attempt in range(retries):
             self._wait_for_rate_limit()
             try:
                 response = self.session.get(url, timeout=20)
                 if response.status_code == 200:
+                    self.consecutive_blocked_fetches = 0
                     return response.text
                 if response.status_code in (403, 429, 503):
+                    self._last_fetch_blocked = True
+                    self.consecutive_blocked_fetches += 1
                     retry_after = response.headers.get("Retry-After")
                     if retry_after and retry_after.isdigit():
                         pause = float(retry_after)
                     else:
-                        pause = self._blocked_backoff * (attempt + 1)
+                        pause = min(
+                            self._blocked_backoff * (attempt + 1),
+                            120.0,
+                        )
                     logger.warning(
                         "FreeDictionary blocked/rate-limited (HTTP %s). Waiting %.0fs before retry %s/%s",
                         response.status_code,
                         pause,
                         attempt + 1,
-                        max_retries,
+                        retries,
                     )
+                    if self.consecutive_blocked_fetches >= self.blocked_pause_after:
+                        raise FreeDictionaryBlockedError(
+                            f"TheFreeDictionary blocked this IP (HTTP {response.status_code}) "
+                            f"after {self.consecutive_blocked_fetches} blocked responses. "
+                            "Wait and retry later, or use --api dictionary-api-dev."
+                        )
                     time.sleep(pause)
                     continue
                 logger.warning("FreeDictionary HTTP %s for %s", response.status_code, url)
                 return None
+            except FreeDictionaryBlockedError:
+                raise
             except requests.RequestException as exc:
                 logger.error("FreeDictionary request failed for %s: %s", url, exc)
-                if attempt + 1 < max_retries:
-                    time.sleep(2.0 * (attempt + 1))
+                if attempt + 1 < retries:
+                    time.sleep(min(2.0 * (attempt + 1), 10.0))
                     continue
                 return None
+        self._last_fetch_blocked = True
         return None
 
     @staticmethod
@@ -324,16 +367,22 @@ class FreeDictionaryService:
 
         dict_html = self._fetch_html(dictionary_url)
         if not dict_html:
+            blocked = self._last_fetch_blocked
             return {
                 "word": word_key,
                 "found": False,
+                "blocked": blocked,
                 "source": "none",
                 "definitions": [],
                 "summary": "",
                 "encyclopedia_summary": None,
                 "dictionary_url": dictionary_url,
                 "encyclopedia_url": encyclopedia_url,
-                "reason": "Failed to reach TheFreeDictionary",
+                "reason": (
+                    "TheFreeDictionary blocked this request (HTTP 403/429)"
+                    if blocked
+                    else "Failed to reach TheFreeDictionary"
+                ),
             }
 
         dict_parsed = self._parse_page(dict_html, word_key)
@@ -444,6 +493,7 @@ class FreeDictionaryService:
         return {
             "word": word_key,
             "is_valid": found,
+            "blocked": bool(data.get("blocked")),
             "definitions": definitions,
             "word_forms": [],
             "examples": [],
@@ -473,7 +523,19 @@ class FreeDictionaryService:
 
         async def _validate_one(item: str) -> Dict[str, Any]:
             async with semaphore:
-                return await self.validate_word(item)
+                try:
+                    return await self.validate_word(item)
+                except FreeDictionaryBlockedError as exc:
+                    return {
+                        "word": item,
+                        "is_valid": False,
+                        "blocked": True,
+                        "definitions": [],
+                        "word_forms": [],
+                        "examples": [],
+                        "synonyms": [],
+                        "reason": str(exc),
+                    }
 
         raw = await asyncio.gather(
             *[_validate_one(word) for word in words],

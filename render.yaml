@@ -1,16 +1,65 @@
+# Render Blueprint — https://render.com/docs/blueprint-spec
+# Deploy: Dashboard → New → Blueprint → connect this repo
 services:
   - type: web
     name: word-filter-backend
-    env: docker
+    runtime: docker
+    plan: free
+    region: oregon
     dockerfilePath: backend/Dockerfile
     dockerContext: backend
-    plan: free
+    healthCheckPath: /health
+    autoDeploy: true
     envVars:
       - key: ENVIRONMENT
         value: production
       - key: PORT
-        value: 8000
+        value: "8000"
+      - key: PYTHONUNBUFFERED
+        value: "1"
       - key: LOG_LEVEL
         value: info
+      # Comma-separated frontend origins (Cloudflare Pages). Add your custom domain if used.
       - key: CORS_ORIGINS
-        value: "*"
+        value: https://word-filter-app.pages.dev,https://word-dol.pages.dev,http://localhost:4200
+      # Word list: file (words.txt in image) unless Nhost is configured
+      - key: USE_NHOST
+        value: "false"
+      - key: USE_NHOST_CACHE
+        value: "false"
+      - key: USE_NHOST_SAVE
+        value: "false"
+      - key: STORAGE_TYPE
+        value: file
+      # Free external APIs (no keys required)
+      - key: DATAMUSE_ENABLED
+        value: "true"
+      - key: WORD_GAME_DB_ENABLED
+        value: "true"
+      - key: UI_ALLOW_DATAMUSE
+        value: "true"
+      - key: UI_ALLOW_WORD_GAME_DB
+        value: "true"
+      - key: UI_ALLOW_DICTIONARY_API_DEV
+        value: "true"
+      - key: UI_ALLOW_FREE_DICTIONARY_API_COM
+        value: "true"
+      - key: UI_BACKGROUND_ENRICH
+        value: "true"
+      # Optional paid / quota APIs — set in Render dashboard (sync: false)
+      - key: WORDS_API_RAPIDAPI_KEY
+        sync: false
+      - key: MERRIAM_WEBSTER_API_KEY
+        sync: false
+      - key: OXFORD_DICTIONARIES_APP_ID
+        sync: false
+      - key: OXFORD_DICTIONARIES_APP_KEY
+        sync: false
+      - key: NHOST_SUBDOMAIN
+        sync: false
+      - key: NHOST_REGION
+        sync: false
+      - key: NHOST_DATABASE_URL
+        sync: false
+      - key: NHOST_ADMIN_SECRET
+        sync: false

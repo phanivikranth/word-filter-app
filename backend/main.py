@@ -22,6 +22,9 @@ from words_api_rapidapi_service import WordsApiRapidapiService
 from word_game_db_service import WordGameDbService
 from datamuse_service import DatamuseService
 from daily_scramble_service import DailyScrambleService
+from daily_safe_explore_service import DailySafeExploreService
+from daily_word_challenge_service import DailyWordChallengeService
+from advanced_word_filter_service import AdvancedWordFilterService
 from freedictionary_service import FreeDictionaryService
 from synonym_service import get_synonym_service
 from word_manager import WordManager
@@ -188,6 +191,12 @@ words_api_rapidapi_service = WordsApiRapidapiService()
 word_game_db_service = WordGameDbService()
 datamuse_service = DatamuseService()
 daily_scramble_service = DailyScrambleService()
+daily_safe_explore_service = DailySafeExploreService()
+daily_word_challenge_service = DailyWordChallengeService()
+advanced_word_filter_service = AdvancedWordFilterService(
+    words_api_service=words_api_rapidapi_service,
+    word_game_db_service=word_game_db_service,
+)
 unified_lookup = UnifiedWordLookup(
     oxford_validator,
     merriam_webster_validator,
@@ -471,6 +480,38 @@ async def get_filtered_words(
     }
     filters = {k: v for k, v in filters.items() if v is not None}
     return await filter_words_concurrent(filters, limit)
+
+@app.get("/words/advanced-filter")
+async def get_advanced_filtered_words(
+    contains: Optional[str] = Query(None, description="Letters the word should contain"),
+    starts_with: Optional[str] = Query(None, description="Letters the word should start with"),
+    ends_with: Optional[str] = Query(None, description="Letters the word should end with"),
+    min_length: Optional[int] = Query(None, ge=1, alias="minLength"),
+    max_length: Optional[int] = Query(None, ge=1, alias="maxLength"),
+    exact_length: Optional[int] = Query(None, ge=1, alias="exactLength"),
+    letter_pattern: Optional[str] = Query(None, alias="letterPattern"),
+    limit: Optional[int] = Query(100, ge=1, le=100),
+):
+    """
+    Advanced filter via Words API (letterPattern, letters, lettersMin, lettersMax, limit)
+    with Word Game DB fallback. Empty filters return ~100 browse/random words.
+    """
+    result = await advanced_word_filter_service.filter_words(
+        contains=contains,
+        starts_with=starts_with,
+        ends_with=ends_with,
+        exact_length=exact_length,
+        min_length=min_length,
+        max_length=max_length,
+        letter_pattern=letter_pattern,
+        limit=limit or 100,
+    )
+    if not result.get("success"):
+        raise HTTPException(
+            status_code=503,
+            detail=result.get("error") or "Advanced word filter unavailable",
+        )
+    return result
 
 @app.get("/words/stats")
 async def get_word_stats():
@@ -1337,6 +1378,40 @@ async def datamuse_suggest(
             detail=payload.get("error") or "DataMuse suggest failed",
         )
     return {"success": True, "suggestions": payload["data"]}
+
+@app.get("/datamuse/daily-safe-explore")
+async def datamuse_daily_safe_explore():
+    """Daily Safe Words to Explore — 8-letter DataMuse words (cached per day)."""
+    result = await daily_safe_explore_service.get_daily_words()
+    if not result.get("success"):
+        raise HTTPException(
+            status_code=503,
+            detail=result.get("error") or "Daily safe explore words unavailable",
+        )
+    return {
+        "success": True,
+        "date": result["date"],
+        "words": result["words"],
+        "source": result.get("source", "datamuse"),
+        "cached": result.get("cached", False),
+    }
+
+@app.get("/datamuse/daily-word-challenge")
+async def datamuse_daily_word_challenge():
+    """Daily Word Challenge cards — 4 education-topic DataMuse words (cached per day)."""
+    result = await daily_word_challenge_service.get_daily_challenge()
+    if not result.get("success"):
+        raise HTTPException(
+            status_code=503,
+            detail=result.get("error") or "Daily word challenge unavailable",
+        )
+    return {
+        "success": True,
+        "date": result["date"],
+        "items": result["items"],
+        "source": result.get("source", "datamuse"),
+        "cached": result.get("cached", False),
+    }
 
 @app.get("/puzzle/daily-scramble")
 async def get_daily_scramble_puzzle():

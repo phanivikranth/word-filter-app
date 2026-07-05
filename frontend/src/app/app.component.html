@@ -434,8 +434,14 @@
               <span class="material-symbols-rounded text-secondary text-lg leading-none">explore</span>
               Safe Words to Explore
             </h4>
+            <p *ngIf="safeExploreLoading" class="text-xs text-on-surface-variant italic mb-2">
+              Loading today's words...
+            </p>
+            <p *ngIf="safeExploreError && !safeExploreLoading" class="text-xs text-on-surface-variant mb-2">
+              {{ safeExploreError }}
+            </p>
             <div class="flex flex-wrap gap-2">
-              <div *ngFor="let sugg of quickSuggestions" 
+              <div *ngFor="let sugg of quickSuggestions"
                    (click)="exploreWord(sugg.word)"
                    class="px-3 py-1.5 clay-chip-white rounded-xl flex items-center gap-1.5 cursor-pointer">
                 <span class="material-symbols-rounded text-primary text-sm">{{ sugg.icon }}</span>
@@ -508,17 +514,25 @@
           </div>
         </div>
 
-        <!-- Weekly Word Challenge Section -->
+        <!-- Daily Word Challenge Section -->
         <div class="mt-6">
           <div class="flex items-center justify-between mb-4">
             <h3 class="font-headline-md text-headline-md text-on-surface dark:text-on-surface flex items-center gap-2">
               <span class="material-symbols-rounded text-primary icon-filled">military_tech</span>
-              Weekly Word Challenge
+              Word Challenge
             </h3>
-            <span class="text-label-sm font-label-sm text-primary bg-primary-container px-3 py-1 rounded-full">New Quests Available</span>
+            <span class="text-label-sm font-label-sm text-primary bg-primary-container px-3 py-1 rounded-full">Today's Quests</span>
           </div>
-          <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div *ngFor="let item of weeklyWords" 
+          <p *ngIf="dailyWordChallengeError" class="text-xs text-on-surface-variant mb-2">{{ dailyWordChallengeError }}</p>
+          <div *ngIf="dailyWordChallengeLoading" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div *ngFor="let _ of [1,2,3,4]" class="clay-card p-4 flex flex-col gap-2 animate-pulse">
+              <div class="w-10 h-10 rounded-xl bg-surface-container-high mb-1"></div>
+              <div class="h-4 bg-surface-container-high rounded w-2/3"></div>
+              <div class="h-3 bg-surface-container-high rounded w-full"></div>
+            </div>
+          </div>
+          <div *ngIf="!dailyWordChallengeLoading" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div *ngFor="let item of dailyWordChallenge" 
                  (click)="exploreWord(item.word)"
                  class="clay-card p-4 hover:scale-[1.02] transition-all cursor-pointer group flex flex-col gap-2">
               <div class="w-10 h-10 rounded-xl bg-primary-container text-on-primary-container flex items-center justify-center mb-1">
@@ -540,38 +554,41 @@
       <div *ngIf="searchMode === 'advanced'" class="clay-card p-6 flex flex-col gap-6 animate-fade-in">
         <div>
           <h3 class="font-headline-md font-bold text-on-surface dark:text-on-surface mb-1">Advanced Word Query Filters</h3>
-          <p class="text-body-md text-on-surface-variant dark:text-on-surface-variant">Filter the dictionary with multiple letter positions and lengths constraints in real time.</p>
+          <p class="text-body-md text-on-surface-variant dark:text-on-surface-variant">
+            Query Words API patterns (<code class="text-primary">letterPattern</code>, <code class="text-primary">letters</code>, <code class="text-primary">lettersMin</code>/<code class="text-primary">lettersMax</code>) with Word Game DB fallback.
+          </p>
         </div>
 
         <!-- Form Fields -->
         <form [formGroup]="filterForm" (change)="onFilterChange()" class="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label class="block font-label-sm text-label-sm text-on-surface dark:text-on-surface mb-1.5">Contains Letters</label>
-            <input formControlName="contains" type="text" placeholder="e.g. app" class="w-full p-3 clay-input text-body-md outline-none"/>
+            <input formControlName="contains" type="text" placeholder="e.g. app → .*app.*" class="w-full p-3 clay-input text-body-md outline-none"/>
           </div>
           <div>
             <label class="block font-label-sm text-label-sm text-on-surface dark:text-on-surface mb-1.5">Starts With</label>
-            <input formControlName="starts_with" type="text" placeholder="e.g. a" class="w-full p-3 clay-input text-body-md outline-none"/>
+            <input formControlName="starts_with" type="text" placeholder="e.g. a → ^a…" class="w-full p-3 clay-input text-body-md outline-none"/>
           </div>
           <div>
             <label class="block font-label-sm text-label-sm text-on-surface dark:text-on-surface mb-1.5">Ends With</label>
-            <input formControlName="ends_with" type="text" placeholder="e.g. e" class="w-full p-3 clay-input text-body-md outline-none"/>
+            <input formControlName="ends_with" type="text" placeholder="e.g. e → …e$" class="w-full p-3 clay-input text-body-md outline-none"/>
           </div>
           <div>
             <label class="block font-label-sm text-label-sm text-on-surface dark:text-on-surface mb-1.5">Exact Length</label>
-            <input formControlName="exact_length" type="number" min="1" placeholder="e.g. 5" class="w-full p-3 clay-input text-body-md outline-none"/>
+            <input formControlName="exact_length" type="number" min="1" placeholder="e.g. 6 → letters=6" class="w-full p-3 clay-input text-body-md outline-none"/>
           </div>
           <div>
             <label class="block font-label-sm text-label-sm text-on-surface dark:text-on-surface mb-1.5">Min Length</label>
-            <input formControlName="min_length" type="number" min="1" placeholder="e.g. 3" class="w-full p-3 clay-input text-body-md outline-none"/>
+            <input formControlName="min_length" type="number" min="1" placeholder="e.g. 12 → lettersMin" class="w-full p-3 clay-input text-body-md outline-none"/>
           </div>
           <div>
             <label class="block font-label-sm text-label-sm text-on-surface dark:text-on-surface mb-1.5">Max Length</label>
-            <input formControlName="max_length" type="number" min="1" placeholder="e.g. 10" class="w-full p-3 clay-input text-body-md outline-none"/>
+            <input formControlName="max_length" type="number" min="1" placeholder="e.g. 4 → lettersMax" class="w-full p-3 clay-input text-body-md outline-none"/>
           </div>
           <div>
             <label class="block font-label-sm text-label-sm text-on-surface dark:text-on-surface mb-1.5">Max Results Limit</label>
-            <input formControlName="limit" type="number" min="10" max="1000" class="w-full p-3 clay-input text-body-md outline-none"/>
+            <input formControlName="limit" type="number" min="1" max="100" class="w-full p-3 clay-input text-body-md outline-none"/>
+            <p class="text-xs text-outline mt-1">Words API max 100 per request</p>
           </div>
           <div class="md:col-span-2 flex items-end justify-end gap-2">
             <button type="button" (click)="clearFilters()" class="px-6 py-3 clay-btn font-label-md text-label-md transition-colors">
@@ -597,7 +614,13 @@
         <!-- Result count list -->
         <div *ngIf="!loading && !error">
           <div class="flex justify-between items-center mb-3">
-            <h4 class="font-label-md text-on-surface dark:text-on-surface">Filtered Results ({{ words.length }} found)</h4>
+            <h4 class="font-label-md text-on-surface dark:text-on-surface">
+              Filtered Results ({{ words.length }} found)
+              <span *ngIf="advancedFilterSource" class="text-xs font-normal text-outline ml-2">
+                via {{ advancedFilterSource === 'words_api_rapidapi' ? 'Words API' : 'Word Game DB' }}
+                <span *ngIf="advancedFilterMode === 'browse'"> · browse</span>
+              </span>
+            </h4>
             <span class="text-sm text-outline">Click word to copy</span>
           </div>
 
@@ -607,7 +630,7 @@
                   class="px-3 py-1.5 clay-btn rounded-lg text-body-md cursor-pointer">
               {{ word }}
             </span>
-            <p *ngIf="words.length === 0" class="w-full text-center text-outline p-8">No dictionary words match your filters.</p>
+            <p *ngIf="words.length === 0" class="w-full text-center text-outline p-8">No words match your filters. Try broader criteria or reset.</p>
           </div>
         </div>
       </div>

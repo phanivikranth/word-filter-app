@@ -23,7 +23,9 @@ try:
     from oxford_validator import OxfordValidator
     from merriam_webster_validator import MerriamWebsterValidator
     from oxford_dictionaries_api_validator import OxfordDictionariesApiValidator
-    from freedictionary_service import FreeDictionaryService
+    from freedictionary_service import FreeDictionaryService, FreeDictionaryBlockedError
+    from dictionary_api_dev_service import DictionaryApiDevService
+    from freedictionary_api_com_service import FreeDictionaryApiComService
     from unified_word_lookup import UnifiedWordLookup, BULK_VALIDATE_SOURCE_ORDER
 except ModuleNotFoundError as exc:
     print(
@@ -40,7 +42,23 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 CHECKPOINT_FILE = "validation_checkpoint.json"
-API_CHOICES = ("combined", "oxford", "oxford-api", "merriam", "freedictionary")
+API_CHOICES = (
+    "combined",
+    "oxford",
+    "oxford-api",
+    "merriam",
+    "freedictionary",
+    "dictionary-api-dev",
+    "freedictionary-api-com",
+    "free-apis",
+)
+# Free REST APIs only — no scrapers, avoids TheFreeDictionary 403 blocks.
+FREE_API_SOURCE_ORDER = (
+    "dictionary_api_dev",
+    "freedictionary_api_com",
+    "datamuse",
+    "word_game_db",
+)
 
 
 def resolve_word_file_paths(
@@ -92,6 +110,8 @@ class WordValidationProcessor:
         invalid_words_file: str | None = None,
         checkpoint_file: str | None = None,
         request_delay: float = 2.0,
+        blocked_backoff: float = 15.0,
+        blocked_pause_after: int = 3,
     ):
         if api_mode not in API_CHOICES:
             raise ValueError(f"api_mode must be one of {API_CHOICES}")
@@ -106,6 +126,8 @@ class WordValidationProcessor:
         self.api_mode = api_mode
         self.concurrency = max(1, min(concurrency, 50))
         self.request_delay = max(0.0, request_delay)
+        self.blocked_backoff = max(1.0, blocked_backoff)
+        self.blocked_pause_after = max(1, blocked_pause_after)
         self.words_file = paths["words_file"]
         self.valid_words_file = paths["valid_words_file"]
         self.invalid_words_file = paths["invalid_words_file"]
@@ -121,11 +143,17 @@ class WordValidationProcessor:
             request_delay=self.request_delay
         )
         self.freedictionary_service.set_concurrency(self.concurrency)
+        self.freedictionary_service.set_blocked_backoff(self.blocked_backoff)
+        self.freedictionary_service.set_blocked_pause_after(self.blocked_pause_after)
+        self.dictionary_api_dev_service = DictionaryApiDevService()
+        self.freedictionary_api_com_service = FreeDictionaryApiComService()
         self.unified_lookup = UnifiedWordLookup(
             self.oxford_validator,
             self.merriam_validator,
             self.oxford_api_validator,
-            self.freedictionary_service,
+            self.dictionary_api_dev_service,
+            self.freedictionary_api_com_service,
+            freedictionary_service=self.freedictionary_service,
         )
 
     async def _validate_batch(self, batch: List[str]) -> Dict:
@@ -146,6 +174,20 @@ class WordValidationProcessor:
         if self.api_mode == "freedictionary":
             return await self.freedictionary_service.validate_words_batch(
                 batch, max_concurrent=concurrent
+            )
+        if self.api_mode == "dictionary-api-dev":
+            return await self.dictionary_api_dev_service.validate_words_batch(
+                batch, max_concurrent=concurrent
+            )
+        if self.api_mode == "freedictionary-api-com":
+            return await self.freedictionary_api_com_service.validate_words_batch(
+                batch, max_concurrent=concurrent
+            )
+        if self.api_mode == "free-apis":
+            return await self.unified_lookup.validate_words_batch(
+                batch,
+                source_order=FREE_API_SOURCE_ORDER,
+                max_concurrent=concurrent,
             )
         return await self.unified_lookup.validate_words_batch(
             batch,
@@ -172,9 +214,23 @@ class WordValidationProcessor:
             )
         elif self.api_mode == "freedictionary":
             logger.info(
-                "API mode: TheFreeDictionary only — delay %.1fs between requests, concurrency %s",
+                "API mode: TheFreeDictionary scraper — delay %.1fs, blocked backoff %.0fs, pause after %s blocks",
                 self.request_delay,
-                self.concurrency,
+                self.blocked_backoff,
+                self.blocked_pause_after,
+            )
+        elif self.api_mode == "dictionary-api-dev":
+            logger.info(
+                "API mode: dictionaryapi.dev (free REST API, no scraping)"
+            )
+        elif self.api_mode == "freedictionary-api-com":
+            logger.info(
+                "API mode: freedictionaryapi.com (free REST API, no scraping)"
+            )
+        elif self.api_mode == "free-apis":
+            logger.info(
+                "API mode: free REST APIs only (%s)",
+                " -> ".join(FREE_API_SOURCE_ORDER),
             )
         else:
             mw_stats = self.merriam_validator.get_usage_stats()
@@ -319,21 +375,49 @@ class WordValidationProcessor:
             
             try:
                 batch_result = await self._validate_batch(batch)
-                all_results.extend(batch_result["results"])
-                
+
                 batch_valid: List[str] = []
                 batch_invalid: List[str] = []
+                stopped_on_block = False
                 for result in batch_result["results"]:
+                    if result.get("blocked"):
+                        stopped_on_block = True
+                        logger.error(
+                            "TheFreeDictionary blocked at word '%s' (index %s). "
+                            "Checkpoint saved — wait and resume, or use "
+                            "--api dictionary-api-dev / free-apis. %s",
+                            result.get("word"),
+                            processed_count,
+                            result.get("reason", ""),
+                        )
+                        break
                     if result["is_valid"]:
                         batch_valid.append(result["word"])
                         valid_words.append(result["word"])
                     else:
                         batch_invalid.append(result["word"])
                         invalid_words.append(result["word"])
+                    all_results.append(result)
                     processed_count += 1
 
-                self.append_word_lists(batch_valid, batch_invalid)
-                self.save_checkpoint(processed_count, len(valid_words), len(invalid_words))
+                if batch_valid or batch_invalid:
+                    self.append_word_lists(batch_valid, batch_invalid)
+                    self.save_checkpoint(
+                        processed_count, len(valid_words), len(invalid_words)
+                    )
+
+                if stopped_on_block:
+                    return {
+                        "total_words": len(words),
+                        "valid_words": len(valid_words),
+                        "invalid_words": len(invalid_words),
+                        "invalid_word_list": invalid_words,
+                        "valid_word_list": valid_words,
+                        "validation_results": all_results,
+                        "blocked": True,
+                        "blocked_at_index": processed_count,
+                    }
+
                 # Show progress every 100 words
                 if processed_count % 100 == 0:
                     logger.info(
@@ -345,6 +429,26 @@ class WordValidationProcessor:
                 if batch_delay > 0:
                     await asyncio.sleep(batch_delay)
                 
+            except FreeDictionaryBlockedError as exc:
+                logger.error(
+                    "Stopped at batch %s (word index %s): %s",
+                    batch_num,
+                    processed_count,
+                    exc,
+                )
+                self.save_checkpoint(
+                    processed_count, len(valid_words), len(invalid_words)
+                )
+                return {
+                    "total_words": len(words),
+                    "valid_words": len(valid_words),
+                    "invalid_words": len(invalid_words),
+                    "invalid_word_list": invalid_words,
+                    "valid_word_list": valid_words,
+                    "validation_results": all_results,
+                    "blocked": True,
+                    "blocked_at_index": processed_count,
+                }
             except Exception as e:
                 logger.error(f"Error processing batch {batch_num}: {e}")
                 # Continue with next batch
@@ -501,6 +605,17 @@ class WordValidationProcessor:
         else:
             print("\nAll words are valid!")
 
+        if validation_result.get("blocked"):
+            print(
+                f"\n*** STOPPED: IP blocked at word index "
+                f"{validation_result.get('blocked_at_index', '?')} ***"
+            )
+            print(
+                "Resume later with the same command (no --fresh), or switch API:\n"
+                "  validate_words.cmd --api dictionary-api-dev --input invalid_words.txt "
+                "--concurrency 3 --batch-size 50 --batch-delay 1"
+            )
+
 async def main():
     """Main validation process"""
     parser = argparse.ArgumentParser(
@@ -541,22 +656,37 @@ async def main():
         help="Seconds between TheFreeDictionary HTTP requests (default: 4 for freedictionary API mode)",
     )
     parser.add_argument(
+        "--blocked-backoff",
+        type=float,
+        default=15.0,
+        help="Seconds to wait on TheFreeDictionary 403/429 before retry (default: 15, was 60)",
+    )
+    parser.add_argument(
+        "--blocked-pause-after",
+        type=int,
+        default=3,
+        help="Stop run after this many consecutive blocked responses (default: 3)",
+    )
+    parser.add_argument(
         "--api",
         choices=API_CHOICES,
         default="combined",
         help=(
-            "Dictionary API: combined (default), oxford, oxford-api, merriam, "
-            "freedictionary = TheFreeDictionary only (slow, IP-safe)"
+            "API: combined, oxford, oxford-api, merriam, freedictionary (scraper, may 403), "
+            "dictionary-api-dev (recommended), freedictionary-api-com, free-apis"
         ),
     )
     args = parser.parse_args()
 
+    slow_scrape_apis = {"freedictionary"}
+    free_rest_apis = {"dictionary-api-dev", "freedictionary-api-com", "free-apis"}
+
     if args.concurrency is None:
-        args.concurrency = 1 if args.api == "freedictionary" else 20
+        args.concurrency = 1 if args.api in slow_scrape_apis else 10
     if args.batch_delay is None:
-        args.batch_delay = 5.0 if args.api == "freedictionary" else 1.0
+        args.batch_delay = 5.0 if args.api in slow_scrape_apis else 0.5
     if args.request_delay is None:
-        args.request_delay = 4.0 if args.api == "freedictionary" else 2.0
+        args.request_delay = 4.0 if args.api in slow_scrape_apis else 2.0
 
     if args.concurrency < 1 or args.concurrency > 50:
         parser.error("--concurrency must be between 1 and 50")
@@ -564,6 +694,10 @@ async def main():
         parser.error("--batch-delay must be >= 0")
     if args.request_delay < 0:
         parser.error("--request-delay must be >= 0")
+    if args.blocked_backoff < 1:
+        parser.error("--blocked-backoff must be >= 1")
+    if args.blocked_pause_after < 1:
+        parser.error("--blocked-pause-after must be >= 1")
 
     processor = WordValidationProcessor(
         api_mode=args.api,
@@ -572,6 +706,8 @@ async def main():
         valid_words_file=args.valid_output,
         invalid_words_file=args.invalid_output,
         request_delay=args.request_delay,
+        blocked_backoff=args.blocked_backoff,
+        blocked_pause_after=args.blocked_pause_after,
     )
 
     api_labels = {
@@ -579,7 +715,10 @@ async def main():
         "oxford": "Oxford web scraper only",
         "oxford-api": "Oxford Dictionaries API only (500/day)",
         "merriam": "Merriam-Webster only",
-        "freedictionary": "TheFreeDictionary only (dictionary + encyclopedia)",
+        "freedictionary": "TheFreeDictionary scraper (may 403 — use dictionary-api-dev instead)",
+        "dictionary-api-dev": "dictionaryapi.dev free REST API (recommended)",
+        "freedictionary-api-com": "freedictionaryapi.com free REST API",
+        "free-apis": "dictionaryapi.dev -> freedictionaryapi.com -> DataMuse -> Word Game DB",
     }
     print(f"Starting Dictionary Word Validation - {api_labels[args.api]}")
     print(f"Input:  {processor.words_file}")
@@ -590,6 +729,12 @@ async def main():
     print(f"Batch size (checkpoint): {args.batch_size}")
     if args.api == "freedictionary":
         print(f"Request delay (TheFreeDictionary): {args.request_delay}s per HTTP call")
+        print(
+            f"Blocked backoff: {args.blocked_backoff}s | "
+            f"pause after {args.blocked_pause_after} consecutive 403/429"
+        )
+    if args.api in free_rest_apis:
+        print("Tip: free REST APIs avoid TheFreeDictionary 403 blocks.")
     print(f"Batch delay: {args.batch_delay}s")
     print("\n" + "-"*60)
     

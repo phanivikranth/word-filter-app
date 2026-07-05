@@ -41,6 +41,39 @@ export class WordService {
     return this.http.get<string[]>(`${this.baseUrl}/words`, { params });
   }
 
+  /** Advanced filter via Words API + Word Game DB fallback */
+  getAdvancedFilteredWords(filter: WordFilter): Observable<AdvancedFilterResponse> {
+    let params = new HttpParams();
+
+    if (filter.contains) {
+      params = params.set('contains', filter.contains);
+    }
+    if (filter.starts_with) {
+      params = params.set('starts_with', filter.starts_with);
+    }
+    if (filter.ends_with) {
+      params = params.set('ends_with', filter.ends_with);
+    }
+    if (filter.min_length) {
+      params = params.set('minLength', filter.min_length.toString());
+    }
+    if (filter.max_length) {
+      params = params.set('maxLength', filter.max_length.toString());
+    }
+    if (filter.exact_length) {
+      params = params.set('exactLength', filter.exact_length.toString());
+    }
+    if (filter.letter_pattern) {
+      params = params.set('letterPattern', filter.letter_pattern);
+    }
+    params = params.set('limit', String(filter.limit || 100));
+
+    return this.http.get<AdvancedFilterResponse>(
+      `${this.baseUrl}/words/advanced-filter`,
+      { params }
+    );
+  }
+
   getWordStats(): Observable<WordStats> {
     return this.http.get<WordStats>(`${this.baseUrl}/words/stats`);
   }
@@ -271,6 +304,20 @@ export class WordService {
     return this.http.get<DailyScrambleResponse>(`${this.baseUrl}/puzzle/daily-scramble`);
   }
 
+  /** Daily Safe Words to Explore — DataMuse 8-letter words, stable per day */
+  getDailySafeExplore(): Observable<DailySafeExploreResponse> {
+    return this.http.get<DailySafeExploreResponse>(
+      `${this.baseUrl}/datamuse/daily-safe-explore`
+    );
+  }
+
+  /** Daily Word Challenge — 4 education-topic words with definitions, stable per day */
+  getDailyWordChallenge(): Observable<DailyWordChallengeResponse> {
+    return this.http.get<DailyWordChallengeResponse>(
+      `${this.baseUrl}/datamuse/daily-word-challenge`
+    );
+  }
+
   // Get storage connectivity info
   getStorageInfo(): Observable<any> {
     return this.http.get<any>(`${this.baseUrl}/storage/info`);
@@ -361,6 +408,38 @@ export interface DailyScrambleResponse {
   hint: string;
   source?: string;
   cached?: boolean;
+}
+
+export interface DailySafeExploreResponse {
+  success: boolean;
+  date: string;
+  words: string[];
+  source?: string;
+  cached?: boolean;
+}
+
+export interface DailyWordChallengeItem {
+  word: string;
+  definition: string;
+}
+
+export interface DailyWordChallengeResponse {
+  success: boolean;
+  date: string;
+  items: DailyWordChallengeItem[];
+  source?: string;
+  cached?: boolean;
+}
+
+export interface AdvancedFilterResponse {
+  success: boolean;
+  words: string[];
+  count: number;
+  source?: string;
+  mode?: 'browse' | 'filter';
+  letterPattern?: string;
+  fallback?: boolean;
+  error?: string;
 }
 
 export interface OxfordValidationResponse {

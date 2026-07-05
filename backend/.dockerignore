@@ -22,6 +22,13 @@ tests/
 logs/
 *.sqlite
 *.db
+.env
+.env.*
+!.env.example
+
+# Runtime caches (recreated on the server)
+data/*_cache.json
+validation_checkpoint*.json
 
 # IDE
 .vscode/

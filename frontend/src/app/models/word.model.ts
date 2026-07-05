@@ -5,6 +5,7 @@ export interface WordFilter {
   min_length?: number;
   max_length?: number;
   exact_length?: number;
+  letter_pattern?: string;
   limit?: number;
 }
 

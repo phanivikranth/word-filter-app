@@ -21,7 +21,7 @@ services:
         value: info
       # Comma-separated frontend origins (Cloudflare Pages). Add your custom domain if used.
       - key: CORS_ORIGINS
-        value: https://word-filter-app.pages.dev,https://word-dol.pages.dev,http://localhost:4200,http://localhost:4201,http://127.0.0.1:4200,http://127.0.0.1:4201
+        value: https://word-filter-app.pages.dev,https://word-dol.pages.dev,https://terse-aw8.pages.dev,http://localhost:4200,http://localhost:4201,http://127.0.0.1:4200,http://127.0.0.1:4201
       # Word list: file (words.txt in image) unless Nhost is configured
       - key: USE_NHOST
         value: "false"

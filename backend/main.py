@@ -150,6 +150,7 @@ _default_origins = [
     "http://127.0.0.1:4201",
     "https://word-dol.pages.dev",  # Cloudflare Pages production
     "https://word-filter-app.pages.dev",  # Cloudflare Pages default domain
+    "https://terse-aw8.pages.dev",  # Cloudflare Pages deployment
 ]
 _cors_env = os.getenv("CORS_ORIGINS", "").strip()
 if _cors_env == "*":

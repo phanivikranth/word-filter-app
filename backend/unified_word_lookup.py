@@ -20,6 +20,7 @@ from dictionary_source_config import (
     get_enrich_source_flags,
     get_portal_source_flags,
 )
+from api_source_cooldown import get_source_cooldown
 from freedictionary_api_com_service import FreeDictionaryApiComService
 from freedictionary_service import FreeDictionaryService
 from merriam_webster_validator import MerriamWebsterValidator
@@ -363,6 +364,8 @@ class UnifiedWordLookup:
             allow_oxford_web=allow_oxford_web,
             allow_freedictionary=allow_freedictionary,
         )
+        cooldown = get_source_cooldown()
+        order = cooldown.filter_available(order)
         effective_allow_oxford_web = (
             allow_oxford_web if allow_oxford_web is not None else flags.oxford_web
         )
@@ -371,18 +374,24 @@ class UnifiedWordLookup:
             return self._not_found(word, sources_tried, details)
 
         for source in order:
+            if not cooldown.is_available(source):
+                continue
             if source == "merriam_webster":
                 if not flags.merriam_webster:
                     continue
-                if not (
-                    self.merriam_validator.is_configured()
-                    and self.merriam_validator.has_quota()
-                ):
+                if not self.merriam_validator.is_configured():
+                    continue
+                if not self.merriam_validator.has_quota():
+                    cooldown.mark_unavailable(
+                        "merriam_webster",
+                        "Merriam-Webster daily quota exhausted",
+                    )
                     continue
                 sources_tried.append(source)
                 mw = await self.merriam_validator.validate_word(word)
                 details[source] = mw
                 if self._has_content(mw):
+                    cooldown.record_success(source)
                     primary = self._from_api_result(word, source, mw)
                     return await self._finalize(
                         primary,
@@ -393,19 +402,24 @@ class UnifiedWordLookup:
                         allow_oxford_web=effective_allow_oxford_web,
                         skip_pronunciation_enrichment=skip_pronunciation_enrichment,
                     )
+                cooldown.record_failure(source, result=mw)
 
             elif source == "oxford_dictionaries_api":
                 if not flags.oxford_dictionaries_api:
                     continue
-                if not (
-                    self.oxford_api_validator.is_configured()
-                    and self.oxford_api_validator.has_quota()
-                ):
+                if not self.oxford_api_validator.is_configured():
+                    continue
+                if not self.oxford_api_validator.has_quota():
+                    cooldown.mark_unavailable(
+                        "oxford_dictionaries_api",
+                        "Oxford Dictionaries API daily quota exhausted",
+                    )
                     continue
                 sources_tried.append(source)
                 oda = await self.oxford_api_validator.validate_word(word)
                 details[source] = oda
                 if self._has_content(oda):
+                    cooldown.record_success(source)
                     primary = self._from_api_result(word, source, oda)
                     return await self._finalize(
                         primary,
@@ -416,6 +430,7 @@ class UnifiedWordLookup:
                         allow_oxford_web=effective_allow_oxford_web,
                         skip_pronunciation_enrichment=skip_pronunciation_enrichment,
                     )
+                cooldown.record_failure(source, result=oda)
 
             elif source == "words_api_rapidapi":
                 if not flags.words_api_rapidapi:
@@ -535,8 +550,18 @@ class UnifiedWordLookup:
                 if not flags.freedictionary:
                     continue
                 sources_tried.append(source)
-                fd = await self.freedictionary_service.lookup_word(word)
+                try:
+                    fd = await self.freedictionary_service.lookup_word(word)
+                except Exception as exc:
+                    cooldown.record_failure(source, exc=exc)
+                    continue
                 details[source] = fd
+                if fd.get("blocked"):
+                    cooldown.record_failure(
+                        source,
+                        result={"blocked": True, "reason": fd.get("reason", "blocked")},
+                    )
+                    continue
                 if fd.get("found"):
                     primary = self._from_freedictionary(word, fd)
                     return await self._finalize(

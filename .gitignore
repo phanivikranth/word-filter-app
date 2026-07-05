@@ -21,6 +21,7 @@ backend/data/enrich_checkpoint.json
 backend/data/daily_scramble_cache.json
 backend/data/daily_safe_explore_cache.json
 backend/data/daily_word_challenge_cache.json
+backend/data/api_source_cooldown.json
 backend/data/sample_words_definitions_old.json
 words_year.txt
 

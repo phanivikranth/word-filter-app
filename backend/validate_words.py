@@ -11,7 +11,7 @@ import logging
 import os
 import sys
 from pathlib import Path
-from typing import List, Dict
+from typing import Any, Dict, List, Optional
 
 # Run from backend/ regardless of current working directory.
 BACKEND_DIR = Path(__file__).resolve().parent
@@ -20,12 +20,25 @@ if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
 try:
+    from dotenv import load_dotenv
+
+    load_dotenv(BACKEND_DIR / ".env")
+except ImportError:
+    pass
+
+try:
     from oxford_validator import OxfordValidator
     from merriam_webster_validator import MerriamWebsterValidator
     from oxford_dictionaries_api_validator import OxfordDictionariesApiValidator
     from freedictionary_service import FreeDictionaryService, FreeDictionaryBlockedError
     from dictionary_api_dev_service import DictionaryApiDevService
     from freedictionary_api_com_service import FreeDictionaryApiComService
+    from words_api_rapidapi_service import WordsApiRapidapiService
+    from word_game_db_service import WordGameDbService
+    from datamuse_service import DatamuseService
+    from nhost_service import NhostWordService
+    from dictionary_source_config import get_validate_source_flags
+    from api_source_cooldown import ApiSourceCooldown, get_source_cooldown
     from unified_word_lookup import UnifiedWordLookup, BULK_VALIDATE_SOURCE_ORDER
 except ModuleNotFoundError as exc:
     print(
@@ -43,6 +56,7 @@ logger = logging.getLogger(__name__)
 
 CHECKPOINT_FILE = "validation_checkpoint.json"
 API_CHOICES = (
+    "exhaust-all",
     "combined",
     "oxford",
     "oxford-api",
@@ -52,6 +66,8 @@ API_CHOICES = (
     "freedictionary-api-com",
     "free-apis",
 )
+# Per-source waterfall for --api exhaust-all (blocked APIs are skipped, not fatal).
+EXHAUST_ALL_SOURCE_ORDER = BULK_VALIDATE_SOURCE_ORDER
 # Free REST APIs only — no scrapers, avoids TheFreeDictionary 403 blocks.
 FREE_API_SOURCE_ORDER = (
     "dictionary_api_dev",
@@ -102,7 +118,7 @@ def resolve_word_file_paths(
 class WordValidationProcessor:
     def __init__(
         self,
-        api_mode: str = "combined",
+        api_mode: str = "exhaust-all",
         concurrency: int = 20,
         *,
         words_file: str = "words.txt",
@@ -112,6 +128,8 @@ class WordValidationProcessor:
         request_delay: float = 2.0,
         blocked_backoff: float = 15.0,
         blocked_pause_after: int = 3,
+        use_nhost_cache: bool = True,
+        save_to_nhost: bool = True,
     ):
         if api_mode not in API_CHOICES:
             raise ValueError(f"api_mode must be one of {API_CHOICES}")
@@ -132,6 +150,14 @@ class WordValidationProcessor:
         self.valid_words_file = paths["valid_words_file"]
         self.invalid_words_file = paths["invalid_words_file"]
         self.checkpoint_file = paths["checkpoint_file"]
+        self.use_nhost_cache = use_nhost_cache
+        self.save_to_nhost = save_to_nhost
+        self.nhost_service = NhostWordService()
+        self.stats: Dict[str, int] = {
+            "nhost_hits": 0,
+            "nhost_saves": 0,
+            "nhost_save_errors": 0,
+        }
 
         self.oxford_validator = OxfordValidator()
         self.oxford_validator.set_concurrency(self.concurrency)
@@ -147,17 +173,264 @@ class WordValidationProcessor:
         self.freedictionary_service.set_blocked_pause_after(self.blocked_pause_after)
         self.dictionary_api_dev_service = DictionaryApiDevService()
         self.freedictionary_api_com_service = FreeDictionaryApiComService()
+        self.words_api_service = WordsApiRapidapiService()
+        self.word_game_db_service = WordGameDbService()
+        self.datamuse_service = DatamuseService()
         self.unified_lookup = UnifiedWordLookup(
             self.oxford_validator,
             self.merriam_validator,
             self.oxford_api_validator,
             self.dictionary_api_dev_service,
             self.freedictionary_api_com_service,
+            words_api_rapidapi_service=self.words_api_service,
+            word_game_db_service=self.word_game_db_service,
+            datamuse_service=self.datamuse_service,
             freedictionary_service=self.freedictionary_service,
         )
+        self.validate_source_flags = get_validate_source_flags()
+        self.source_cooldown = get_source_cooldown()
+
+    def refresh_source_cooldowns(self) -> None:
+        """Sync quota-based cooldowns and log any sources resting for 24h."""
+        self.source_cooldown.sync_quota_sources(
+            merriam_validator=self.merriam_validator,
+            oxford_api_validator=self.oxford_api_validator,
+        )
+        summary = self.source_cooldown.summary()
+        cooled = summary.get("cooled_sources") or {}
+        if cooled:
+            logger.info(
+                "API sources on cooldown (%sh): %s",
+                summary.get("cooldown_hours"),
+                ", ".join(
+                    f"{name} ({info.get('remaining_hours')}h left)"
+                    for name, info in cooled.items()
+                ),
+            )
+
+    async def _nhost_cache_hit(self, word: str) -> Optional[Dict[str, Any]]:
+        if not self.use_nhost_cache or not self.nhost_service.is_configured():
+            return None
+        try:
+            entry = await self.nhost_service.lookup_word(word)
+        except Exception as exc:
+            logger.warning("Nhost lookup failed for '%s': %s", word, exc)
+            return None
+        if not entry:
+            return None
+        definitions = list(entry.get("definitions") or [])
+        summary = (entry.get("summary") or "").strip()
+        is_valid = bool(entry.get("is_valid")) and bool(definitions or summary)
+        if not is_valid:
+            return None
+        self.stats["nhost_hits"] += 1
+        payload = {
+            "word": word.strip().lower(),
+            "is_valid": True,
+            "definitions": definitions or ([summary] if summary else []),
+            "word_forms": list(entry.get("word_forms") or []),
+            "examples": list(entry.get("examples") or []),
+            "synonyms": list(entry.get("synonyms") or []),
+            "pronunciations": list(entry.get("pronunciations") or []),
+            "etymology": (entry.get("etymology") or "").strip(),
+            "origin_language": (entry.get("origin_language") or "").strip(),
+            "first_known_use": (entry.get("first_known_use") or "").strip(),
+            "reason": "Found in Nhost word database (skipped external APIs)",
+            "validation_source": "nhost",
+            "summary": summary or (definitions[0] if definitions else ""),
+            "from_nhost": True,
+        }
+        return payload
+
+    async def _persist_to_nhost(self, result: Dict[str, Any]) -> bool:
+        if not self.save_to_nhost or result.get("from_nhost"):
+            return False
+        if not result.get("is_valid"):
+            return False
+        if not self.nhost_service.is_configured():
+            logger.warning(
+                "Nhost not configured — cannot save '%s'", result.get("word")
+            )
+            return False
+        if not self.nhost_service.database_url:
+            logger.warning(
+                "NHOST_DATABASE_URL missing — cannot save '%s'", result.get("word")
+            )
+            return False
+
+        previous = self.nhost_service.save_on_lookup
+        self.nhost_service.save_on_lookup = True
+        try:
+            await self.nhost_service.save_word_entry(result)
+            self.stats["nhost_saves"] += 1
+            logger.info(
+                "Saved '%s' to Nhost (source: %s)",
+                result.get("word"),
+                result.get("validation_source"),
+            )
+            return True
+        except Exception as exc:
+            self.stats["nhost_save_errors"] += 1
+            logger.warning("Nhost save failed for '%s': %s", result.get("word"), exc)
+            return False
+        finally:
+            self.nhost_service.save_on_lookup = previous
+
+    async def _lookup_word_exhaust(self, word: str) -> Dict[str, Any]:
+        """Try each dictionary API in order; skip blocked or failing sources."""
+        word_key = word.strip().lower()
+        sources_tried: List[str] = []
+        order = self.source_cooldown.filter_available(
+            self.validate_source_flags.filter_order(EXHAUST_ALL_SOURCE_ORDER)
+        )
+
+        if not order:
+            return self.unified_lookup._not_found(
+                word_key,
+                [],
+                {},
+            )
+
+        for source in order:
+            sources_tried.append(source)
+            try:
+                result = await self.unified_lookup.lookup_word(
+                    word_key,
+                    source_order=(source,),
+                    source_flags=self.validate_source_flags,
+                    skip_pronunciation_enrichment=True,
+                )
+            except FreeDictionaryBlockedError as exc:
+                self.source_cooldown.record_failure(source, exc=exc)
+                logger.warning(
+                    "Source %s blocked for '%s' — cooled down, trying next API",
+                    source,
+                    word_key,
+                )
+                continue
+            except Exception as exc:
+                if self.source_cooldown.record_failure(source, exc=exc):
+                    logger.warning(
+                        "Source %s on cooldown after error for '%s'",
+                        source,
+                        word_key,
+                    )
+                else:
+                    logger.warning(
+                        "Source %s failed for '%s' — trying next API (%s)",
+                        source,
+                        word_key,
+                        exc,
+                    )
+                continue
+
+            if result.get("blocked"):
+                self.source_cooldown.record_failure(source, result=result)
+                logger.warning(
+                    "Source %s blocked for '%s' — cooled down, trying next API",
+                    source,
+                    word_key,
+                )
+                continue
+
+            if not result.get("is_valid"):
+                self.source_cooldown.record_failure(source, result=result)
+
+            if result.get("is_valid"):
+                self.source_cooldown.record_success(source)
+                result["sources_exhausted_until"] = source
+                await self._persist_to_nhost(result)
+                return result
+
+        return self.unified_lookup._not_found(word_key, sources_tried, {})
+
+    async def _validate_one_word(self, word: str) -> Dict[str, Any]:
+        cached = await self._nhost_cache_hit(word)
+        if cached:
+            return cached
+
+        if self.api_mode == "exhaust-all":
+            return await self._lookup_word_exhaust(word)
+
+        if self.api_mode == "oxford":
+            result = await self.oxford_validator.validate_word(word)
+        elif self.api_mode == "oxford-api":
+            result = await self.oxford_api_validator.validate_word(word)
+        elif self.api_mode == "merriam":
+            result = await self.merriam_validator.validate_word(word)
+        elif self.api_mode == "freedictionary":
+            result = await self.freedictionary_service.validate_word(word)
+        elif self.api_mode == "dictionary-api-dev":
+            result = await self.dictionary_api_dev_service.validate_word(word)
+        elif self.api_mode == "freedictionary-api-com":
+            result = await self.freedictionary_api_com_service.validate_word(word)
+        elif self.api_mode == "free-apis":
+            result = await self.unified_lookup.lookup_word(
+                word,
+                source_order=FREE_API_SOURCE_ORDER,
+                source_flags=self.validate_source_flags,
+                skip_pronunciation_enrichment=True,
+            )
+        else:
+            result = await self.unified_lookup.lookup_word(
+                word,
+                source_order=BULK_VALIDATE_SOURCE_ORDER,
+                source_flags=self.validate_source_flags,
+                skip_pronunciation_enrichment=True,
+            )
+
+        if isinstance(result, dict) and result.get("is_valid"):
+            await self._persist_to_nhost(result)
+        return result
+
+    async def _validate_batch_parallel(self, batch: List[str]) -> List[Dict[str, Any]]:
+        semaphore = asyncio.Semaphore(self.concurrency)
+
+        async def _one(item: str) -> Dict[str, Any]:
+            async with semaphore:
+                try:
+                    return await self._validate_one_word(item)
+                except FreeDictionaryBlockedError as exc:
+                    return {
+                        "word": item,
+                        "is_valid": False,
+                        "blocked": True,
+                        "definitions": [],
+                        "word_forms": [],
+                        "examples": [],
+                        "synonyms": [],
+                        "reason": str(exc),
+                    }
+                except Exception as exc:
+                    logger.error("Exception validating '%s': %s", item, exc)
+                    return self.unified_lookup._not_found(item, [], {})
+
+        raw = await asyncio.gather(*[_one(word) for word in batch], return_exceptions=True)
+        results: List[Dict[str, Any]] = []
+        for index, item in enumerate(raw):
+            if isinstance(item, Exception):
+                word = batch[index]
+                logger.error("Batch exception for '%s': %s", word, item)
+                results.append(self.unified_lookup._not_found(word, [], {}))
+                results[-1]["reason"] = f"Exception: {item}"
+            else:
+                results.append(item)
+        return results
 
     async def _validate_batch(self, batch: List[str]) -> Dict:
         """Validate a batch using the selected API mode."""
+        if self.api_mode in ("exhaust-all", "combined", "free-apis") or (
+            self.use_nhost_cache or self.save_to_nhost
+        ):
+            results = await self._validate_batch_parallel(batch)
+            valid_count = sum(1 for result in results if result.get("is_valid"))
+            return {
+                "total_words": len(results),
+                "valid_words": valid_count,
+                "invalid_words": len(results) - valid_count,
+                "results": results,
+            }
+
         concurrent = self.concurrency
         if self.api_mode == "oxford":
             return await self.oxford_validator.validate_words_batch(
@@ -232,6 +505,17 @@ class WordValidationProcessor:
                 "API mode: free REST APIs only (%s)",
                 " -> ".join(FREE_API_SOURCE_ORDER),
             )
+        elif self.api_mode == "exhaust-all":
+            logger.info(
+                "API mode: exhaust-all — try each API in order until valid (%s)",
+                " -> ".join(
+                    self.validate_source_flags.filter_order(EXHAUST_ALL_SOURCE_ORDER)
+                ),
+            )
+            if self.use_nhost_cache:
+                logger.info("Nhost cache: check database before external APIs")
+            if self.save_to_nhost:
+                logger.info("Nhost save: valid words will be upserted with full data")
         else:
             mw_stats = self.merriam_validator.get_usage_stats()
             oda_stats = self.oxford_api_validator.get_usage_stats()
@@ -281,6 +565,7 @@ class WordValidationProcessor:
         }
         """
         logger.info(f"Starting dictionary validation of {len(words)} words")
+        self.refresh_source_cooldowns()
         self._log_api_mode()
         logger.info(
             "Parallel lookups: up to %s words at a time (batch size: %s)",
@@ -380,7 +665,7 @@ class WordValidationProcessor:
                 batch_invalid: List[str] = []
                 stopped_on_block = False
                 for result in batch_result["results"]:
-                    if result.get("blocked"):
+                    if result.get("blocked") and self.api_mode == "freedictionary":
                         stopped_on_block = True
                         logger.error(
                             "TheFreeDictionary blocked at word '%s' (index %s). "
@@ -612,9 +897,25 @@ class WordValidationProcessor:
             )
             print(
                 "Resume later with the same command (no --fresh), or switch API:\n"
-                "  validate_words.cmd --api dictionary-api-dev --input invalid_words.txt "
+                "  validate_words.cmd --api exhaust-all --input invalid_words.txt "
                 "--concurrency 3 --batch-size 50 --batch-delay 1"
             )
+
+        if any(self.stats.values()):
+            print("\nNhost summary:")
+            print(f"  Cache hits (already in DB): {self.stats['nhost_hits']:,}")
+            print(f"  New/updated saves:          {self.stats['nhost_saves']:,}")
+            if self.stats["nhost_save_errors"]:
+                print(f"  Save errors:                {self.stats['nhost_save_errors']:,}")
+
+        cooled = self.source_cooldown.summary().get("cooled_sources") or {}
+        if cooled:
+            print("\nAPI cooldowns (skipped for ~24h):")
+            for name, info in cooled.items():
+                print(
+                    f"  {name}: {info.get('reason', '')} "
+                    f"({info.get('remaining_hours', '?')}h remaining)"
+                )
 
 async def main():
     """Main validation process"""
@@ -670,19 +971,67 @@ async def main():
     parser.add_argument(
         "--api",
         choices=API_CHOICES,
-        default="combined",
+        default="exhaust-all",
         help=(
-            "API: combined, oxford, oxford-api, merriam, freedictionary (scraper, may 403), "
-            "dictionary-api-dev (recommended), freedictionary-api-com, free-apis"
+            "API: exhaust-all (default — try every API, skip blocks), combined, oxford, "
+            "oxford-api, merriam, freedictionary (scraper, may 403), "
+            "dictionary-api-dev, freedictionary-api-com, free-apis"
         ),
+    )
+    parser.add_argument(
+        "--save-nhost",
+        dest="save_nhost",
+        action="store_true",
+        default=True,
+        help="Save valid words to Nhost with definitions (default: on)",
+    )
+    parser.add_argument(
+        "--no-save-nhost",
+        dest="save_nhost",
+        action="store_false",
+        help="Do not write valid words to Nhost",
+    )
+    parser.add_argument(
+        "--use-nhost-cache",
+        dest="use_nhost_cache",
+        action="store_true",
+        default=True,
+        help="Treat valid Nhost entries as valid without calling external APIs (default: on)",
+    )
+    parser.add_argument(
+        "--skip-nhost-cache",
+        dest="use_nhost_cache",
+        action="store_false",
+        help="Always call external APIs even if the word is already in Nhost",
+    )
+    parser.add_argument(
+        "--reset-cooldowns",
+        action="store_true",
+        help="Clear API cooldown state (re-enable blocked/quota-exhausted sources)",
     )
     args = parser.parse_args()
 
+    if args.reset_cooldowns:
+        cooldown_path = Path(
+            os.getenv(
+                "API_SOURCE_COOLDOWN_FILE",
+                str(BACKEND_DIR / "data" / "api_source_cooldown.json"),
+            )
+        )
+        if cooldown_path.exists():
+            cooldown_path.unlink()
+            print(f"Cleared API cooldown file: {cooldown_path}")
+
     slow_scrape_apis = {"freedictionary"}
-    free_rest_apis = {"dictionary-api-dev", "freedictionary-api-com", "free-apis"}
+    free_rest_apis = {
+        "dictionary-api-dev",
+        "freedictionary-api-com",
+        "free-apis",
+        "exhaust-all",
+    }
 
     if args.concurrency is None:
-        args.concurrency = 1 if args.api in slow_scrape_apis else 10
+        args.concurrency = 1 if args.api in slow_scrape_apis else 5
     if args.batch_delay is None:
         args.batch_delay = 5.0 if args.api in slow_scrape_apis else 0.5
     if args.request_delay is None:
@@ -708,10 +1057,13 @@ async def main():
         request_delay=args.request_delay,
         blocked_backoff=args.blocked_backoff,
         blocked_pause_after=args.blocked_pause_after,
+        use_nhost_cache=args.use_nhost_cache,
+        save_to_nhost=args.save_nhost,
     )
 
     api_labels = {
-        "combined": "Oxford web -> TheFreeDictionary -> Merriam-Webster -> Oxford API",
+        "exhaust-all": "Try every API in order (skip blocks) + Nhost cache/save",
+        "combined": "Oxford web -> free APIs -> Merriam -> Oxford API + Nhost",
         "oxford": "Oxford web scraper only",
         "oxford-api": "Oxford Dictionaries API only (500/day)",
         "merriam": "Merriam-Webster only",
@@ -727,6 +1079,16 @@ async def main():
     print(f"Checkpoint: {processor.checkpoint_file}")
     print(f"Parallel lookups: up to {args.concurrency} words at a time")
     print(f"Batch size (checkpoint): {args.batch_size}")
+    print(f"Nhost cache: {'on' if args.use_nhost_cache else 'off'}")
+    print(f"Nhost save:  {'on' if args.save_nhost else 'off'}")
+    if processor.nhost_service.is_configured():
+        status = processor.nhost_service.get_status()
+        print(
+            f"Nhost DB:    configured"
+            f" (postgres={'yes' if status.get('has_database_url') else 'no'})"
+        )
+    else:
+        print("Nhost DB:    not configured (set NHOST_DATABASE_URL in .env)")
     if args.api == "freedictionary":
         print(f"Request delay (TheFreeDictionary): {args.request_delay}s per HTTP call")
         print(

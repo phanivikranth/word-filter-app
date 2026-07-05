@@ -89,6 +89,25 @@ def get_enrich_source_flags() -> SourceFlags:
     )
 
 
+def get_validate_source_flags() -> SourceFlags:
+    """Flags for validate_words.py — try every configured API in order."""
+    return SourceFlags(
+        merriam_webster=env_bool("VALIDATE_ALLOW_MERRIAM_WEBSTER", "true"),
+        oxford_dictionaries_api=env_bool(
+            "VALIDATE_ALLOW_OXFORD_DICTIONARIES_API", "true"
+        ),
+        dictionary_api_dev=env_bool("VALIDATE_ALLOW_DICTIONARY_API_DEV", "true"),
+        freedictionary_api_com=env_bool(
+            "VALIDATE_ALLOW_FREE_DICTIONARY_API_COM", "true"
+        ),
+        words_api_rapidapi=env_bool("VALIDATE_ALLOW_WORDS_API_RAPIDAPI", "true"),
+        word_game_db=env_bool("VALIDATE_ALLOW_WORD_GAME_DB", "true"),
+        datamuse=env_bool("VALIDATE_ALLOW_DATAMUSE", "true"),
+        oxford_web=env_bool("VALIDATE_ALLOW_OXFORD_WEB", "true"),
+        freedictionary=env_bool("VALIDATE_ALLOW_FREEDICTIONARY", "true"),
+    )
+
+
 def get_nhost_flags() -> NhostFlags:
     return NhostFlags(
         enabled=env_bool("USE_NHOST", "false"),

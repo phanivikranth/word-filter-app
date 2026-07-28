@@ -1,0 +1,417 @@
+<div class="flex flex-col gap-6 animate-fade-in">
+<div class="flex flex-col items-center justify-center text-center">
+          <div class="w-full max-w-3xl flex flex-col md:flex-row gap-4 items-stretch">
+            <div class="relative w-full flex-1">
+              <span class="material-symbols-rounded absolute left-6 top-1/2 -translate-y-1/2 text-outline text-[32px] pointer-events-none">
+                search
+              </span>
+              <input class="w-full h-full min-h-[64px] pl-[64px] pr-16 font-headline-md text-headline-md text-on-surface dark:text-on-surface clay-input placeholder:text-outline outline-none" 
+                     placeholder="Type a word to analyze..." 
+                     type="text"
+                     [(ngModel)]="vm.searchWord"
+                     (input)="vm.onSearchInput()"
+                     (keyup.enter)="vm.searchWordBasic()"/>
+            </div>
+            <div class="flex gap-2 w-full md:w-auto">
+              <button class="flex-1 md:flex-none md:w-auto px-8 py-4 clay-primary font-headline-md text-headline-md transition-all flex items-center justify-center gap-2 group whitespace-nowrap min-h-[64px]"
+                      (click)="vm.searchWordBasic()"
+                      [disabled]="vm.isSearching">
+                <span *ngIf="!vm.isSearching">Check Word</span>
+                <span *ngIf="vm.isSearching" class="inline-block animate-spin material-symbols-rounded">sync</span>
+                <span *ngIf="!vm.isSearching" class="material-symbols-rounded text-[28px] group-hover:translate-x-1 transition-transform">arrow_forward</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Searching State Indicator -->
+        <div *ngIf="vm.isSearching" class="bg-surface-container p-8 rounded-2xl text-center shadow-sm">
+          <span class="material-symbols-rounded text-5xl text-primary animate-spin mb-2">sync</span>
+          <p class="font-headline-md text-on-surface-variant">Analyzing word safety and definitions...</p>
+        </div>
+
+        <!-- Search Error State -->
+        <div *ngIf="vm.searchError" class="bg-error-container text-on-error-container border border-error/20 p-4 rounded-xl flex items-center gap-3">
+          <span class="material-symbols-rounded text-2xl">error</span>
+          <p class="text-body-md">{{ vm.searchError }}</p>
+        </div>
+
+        <!-- Word Analysis Result Panel -->
+        <div *ngIf="vm.searchResult && !vm.isSearching" class="clay-card p-6 flex flex-col gap-5">
+          <!-- Header -->
+          <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-surface-variant dark:border-outline pb-4">
+            <div class="flex items-start gap-3 min-w-0">
+              <div class="w-12 h-12 shrink-0 rounded-full flex items-center justify-center text-white"
+                   [ngClass]="vm.searchResult.oxford?.is_valid || vm.searchResult.inCollection ? 'bg-primary' : 'bg-error'">
+                <span class="material-symbols-rounded text-3xl icon-filled">
+                  {{ vm.searchResult.oxford?.is_valid || vm.searchResult.inCollection ? 'verified' : 'cancel' }}
+                </span>
+              </div>
+              <div class="min-w-0">
+                <h3 class="font-headline-lg text-on-surface dark:text-on-surface flex items-center gap-2 flex-wrap">
+                  {{ vm.searchResult.word | titlecase }}
+                  <button *ngIf="vm.searchResult.oxford?.pronunciations?.length"
+                          type="button"
+                          class="inline-flex items-center gap-1 text-body-md text-outline font-normal hover:text-primary transition-colors"
+                          (click)="vm.playPronunciation(vm.searchResult.oxford!.pronunciations![0].url, vm.searchResult.word)"
+                          [title]="vm.searchResult.oxford!.pronunciations![0].url ? 'Play pronunciation' : 'Speak word'">
+                    <span class="material-symbols-rounded text-base">volume_up</span>
+                    /{{ vm.searchResult.oxford!.pronunciations![0].ipa }}/
+                  </button>
+                </h3>
+                <div class="flex gap-2 mt-2 flex-wrap">
+                  <span *ngFor="let form of vm.searchResult.oxford?.word_forms | slice:0:4"
+                        class="px-2 py-0.5 bg-surface-container-high dark:bg-on-surface-variant text-on-surface-variant dark:text-on-surface rounded-full font-label-sm text-label-sm">
+                    {{ form | titlecase }}
+                  </span>
+                  <span *ngIf="vm.searchResult.inCollection"
+                        class="px-2 py-0.5 bg-primary-container text-on-primary-fixed-variant rounded-full font-label-sm text-label-sm">
+                    In Dictionary File
+                  </span>
+                  <span *ngIf="vm.searchResult.oxford?.validation_source"
+                        class="px-2 py-0.5 bg-secondary-container/60 text-on-secondary-container rounded-full font-label-sm text-label-sm flex items-center gap-1">
+                    <span class="material-symbols-rounded text-xs">source</span>
+                    {{ vm.getValidationSourceLabel(vm.searchResult.oxford!.validation_source) }}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div class="text-left md:text-right shrink-0">
+              <div class="font-headline-md font-bold"
+                   [ngClass]="vm.searchResult.oxford?.is_valid || vm.searchResult.inCollection ? 'text-primary' : 'text-error'">
+                {{ vm.searchResult.oxford?.is_valid || vm.searchResult.inCollection ? '100% Safe' : 'Unverified' }}
+              </div>
+              <div class="font-label-sm text-label-sm text-outline uppercase tracking-wider">Safety Status</div>
+            </div>
+          </div>
+
+          <!-- No dictionary content -->
+          <div *ngIf="!vm.hasDictionaryContent(vm.searchResult.oxford) && !vm.searchResult.inCollection"
+               class="bg-surface-container dark:bg-on-secondary-fixed/50 p-6 rounded-xl border border-dashed border-surface-variant dark:border-outline text-center">
+            <span class="material-symbols-rounded text-4xl text-outline mb-2">menu_book</span>
+            <p class="font-body-md text-on-surface-variant">
+              No dictionary entry found yet for <strong>{{ vm.searchResult.word }}</strong>.
+            </p>
+            <p class="font-label-sm text-outline mt-1">
+              Try another spelling, or check back after the word is enriched in the database.
+            </p>
+          </div>
+
+          <!-- Summary lead -->
+          <div *ngIf="vm.showSummary(vm.searchResult.oxford)"
+               class="bg-primary-container/20 dark:bg-primary-container/10 p-4 rounded-xl border border-primary/20">
+            <p class="font-body-lg text-on-surface dark:text-on-surface leading-relaxed">
+              {{ vm.searchResult.oxford!.summary }}
+            </p>
+          </div>
+
+          <!-- Source note -->
+          <div *ngIf="vm.searchResult.oxford?.reason"
+               class="bg-surface-container dark:bg-on-secondary-fixed/50 px-4 py-3 rounded-xl border border-surface-variant dark:border-outline">
+            <p class="font-label-sm text-label-sm text-outline flex items-start gap-2">
+              <span class="material-symbols-rounded text-secondary text-sm mt-0.5">info</span>
+              <span>{{ vm.searchResult.oxford!.reason }}</span>
+            </p>
+          </div>
+
+          <!-- Main content grid: definitions + side panels -->
+          <div *ngIf="vm.hasDictionaryContent(vm.searchResult.oxford)"
+               class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+            <!-- Left: definitions, examples, synonyms -->
+            <div class="lg:col-span-2 flex flex-col gap-5">
+              <div *ngIf="vm.searchResult.oxford?.definitions?.length"
+                   class="bg-surface-container dark:bg-on-secondary-fixed/50 p-4 rounded-xl border border-surface-variant dark:border-outline">
+                <h4 class="font-label-md text-label-md text-on-surface dark:text-on-surface mb-3 flex items-center gap-2">
+                  <span class="material-symbols-rounded text-primary">book</span>
+                  Definitions
+                </h4>
+                <ol class="space-y-3 pl-1 list-none counter-reset-def">
+                  <li *ngFor="let def of vm.searchResult.oxford!.definitions!; let i = index"
+                      class="flex gap-3 text-body-md text-on-surface-variant dark:text-on-surface-variant">
+                    <span class="shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary font-label-sm text-label-sm flex items-center justify-center">
+                      {{ i + 1 }}
+                    </span>
+                    <span class="pt-0.5">{{ def }}</span>
+                  </li>
+                </ol>
+              </div>
+
+              <div *ngIf="vm.searchResult.oxford?.examples?.length"
+                   class="bg-surface-container dark:bg-on-secondary-fixed/50 p-4 rounded-xl border border-surface-variant dark:border-outline">
+                <h4 class="font-label-md text-label-md text-on-surface dark:text-on-surface mb-3 flex items-center gap-2">
+                  <span class="material-symbols-rounded text-primary">format_quote</span>
+                  Example Sentences
+                </h4>
+                <ul class="space-y-2">
+                  <li *ngFor="let ex of vm.searchResult.oxford!.examples!"
+                      class="pl-3 border-l-2 border-primary/30 font-body-md italic text-on-surface-variant">
+                    {{ ex }}
+                  </li>
+                </ul>
+              </div>
+
+              <div *ngIf="vm.searchResult.oxford?.synonyms?.length"
+                   class="bg-surface-container dark:bg-on-secondary-fixed/50 p-4 rounded-xl border border-surface-variant dark:border-outline">
+                <h4 class="font-label-md text-label-md text-on-surface dark:text-on-surface mb-3 flex items-center gap-2">
+                  <span class="material-symbols-rounded text-primary">tag</span>
+                  Synonyms
+                  <span class="font-label-sm text-outline font-normal">— click to explore</span>
+                </h4>
+                <div class="flex flex-wrap gap-2">
+                  <button *ngFor="let syn of vm.searchResult.oxford!.synonyms!"
+                          type="button"
+                          (click)="vm.exploreWord(syn)"
+                          class="px-3 py-1 bg-tertiary-container/30 text-on-tertiary-container hover:bg-tertiary-container/60 transition-colors border border-tertiary-container/20 rounded-full font-label-sm text-label-sm cursor-pointer shadow-sm">
+                    {{ syn }}
+                  </button>
+                </div>
+              </div>
+
+              <div *ngIf="vm.searchResult.oxford?.antonyms?.length"
+                   class="bg-surface-container dark:bg-on-secondary-fixed/50 p-4 rounded-xl border border-surface-variant dark:border-outline">
+                <h4 class="font-label-md text-label-md text-on-surface dark:text-on-surface mb-3 flex items-center gap-2">
+                  <span class="material-symbols-rounded text-primary">block</span>
+                  Antonyms
+                </h4>
+                <div class="flex flex-wrap gap-2">
+                  <button *ngFor="let ant of vm.searchResult.oxford!.antonyms!"
+                          type="button"
+                          (click)="vm.exploreWord(ant)"
+                          class="px-3 py-1 bg-error-container/20 text-on-error-container hover:bg-error-container/40 transition-colors border border-error-container/20 rounded-full font-label-sm text-label-sm cursor-pointer shadow-sm">
+                    {{ ant }}
+                  </button>
+                </div>
+              </div>
+
+              <div *ngIf="vm.searchResult.oxford?.rhymes?.length"
+                   class="bg-surface-container dark:bg-on-secondary-fixed/50 p-4 rounded-xl border border-surface-variant dark:border-outline">
+                <h4 class="font-label-md text-label-md text-on-surface dark:text-on-surface mb-3 flex items-center gap-2">
+                  <span class="material-symbols-rounded text-primary">music_note</span>
+                  Rhymes
+                </h4>
+                <div class="flex flex-wrap gap-2">
+                  <button *ngFor="let rhyme of vm.searchResult.oxford!.rhymes!"
+                          type="button"
+                          (click)="vm.exploreWord(rhyme)"
+                          class="px-3 py-1 bg-secondary-container/30 text-on-secondary-container hover:bg-secondary-container/60 transition-colors border border-secondary-container/20 rounded-full font-label-sm text-label-sm cursor-pointer shadow-sm">
+                    {{ rhyme }}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right: pronunciation, origin, links -->
+            <div class="flex flex-col gap-5">
+              <div *ngIf="vm.searchResult.oxford?.frequency != null"
+                   class="bg-surface-container dark:bg-on-secondary-fixed/50 p-4 rounded-xl border border-surface-variant dark:border-outline">
+                <h4 class="font-label-md text-label-md text-on-surface dark:text-on-surface mb-2 flex items-center gap-2">
+                  <span class="material-symbols-rounded text-primary">bar_chart</span>
+                  Word frequency
+                </h4>
+                <p class="font-body-md text-on-surface-variant">
+                  Usage score: <strong class="text-on-surface">{{ vm.searchResult.oxford!.frequency }}</strong>
+                  <span class="text-outline"> (Words API — higher means more common)</span>
+                </p>
+              </div>
+
+              <div *ngIf="vm.searchResult.oxford?.pronunciations?.length"
+                   class="bg-surface-container dark:bg-on-secondary-fixed/50 p-4 rounded-xl border border-surface-variant dark:border-outline">
+                <h4 class="font-label-md text-label-md text-on-surface dark:text-on-surface mb-3 flex items-center gap-2">
+                  <span class="material-symbols-rounded text-primary">record_voice_over</span>
+                  Pronunciation
+                </h4>
+                <div class="flex flex-col gap-2">
+                  <div *ngFor="let pron of vm.searchResult.oxford!.pronunciations!"
+                       class="flex items-center justify-between gap-2 py-2 border-b border-surface-variant/50 last:border-0">
+                    <div class="min-w-0">
+                      <span class="px-2 py-0.5 rounded-full bg-primary-container text-on-primary-fixed-variant font-label-sm text-label-sm">
+                        {{ pron.prefix || 'Standard' }}
+                      </span>
+                      <span class="ml-2 font-body-md text-on-surface tracking-wide">/{{ pron.ipa }}/</span>
+                    </div>
+                    <button type="button"
+                            class="shrink-0 w-9 h-9 rounded-full bg-primary/10 hover:bg-primary/20 flex items-center justify-center transition-colors"
+                            [title]="pron.url ? 'Play audio' : 'Speak word'"
+                            (click)="vm.playPronunciation(pron.url, vm.searchResult.word)">
+                      <span class="material-symbols-rounded text-primary icon-filled text-xl">volume_up</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div *ngIf="vm.hasWordOrigin(vm.searchResult.oxford)"
+                   class="bg-surface-container dark:bg-on-secondary-fixed/50 p-4 rounded-xl border border-surface-variant dark:border-outline">
+                <h4 class="font-label-md text-label-md text-on-surface dark:text-on-surface mb-3 flex items-center gap-2">
+                  <span class="material-symbols-rounded text-secondary">history_edu</span>
+                  Word Origin
+                </h4>
+                <p *ngIf="vm.searchResult.oxford?.etymology"
+                   class="font-body-md text-on-surface-variant dark:text-on-surface-variant mb-3 leading-relaxed">
+                  {{ vm.searchResult.oxford!.etymology }}
+                </p>
+                <div class="flex flex-col gap-2 text-body-sm text-outline">
+                  <span *ngIf="vm.searchResult.oxford?.origin_language"
+                        class="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-surface-container-high/80">
+                    <span class="material-symbols-rounded text-sm text-secondary">translate</span>
+                    <span><strong class="text-on-surface-variant">Origin:</strong> {{ vm.searchResult.oxford!.origin_language }}</span>
+                  </span>
+                  <span *ngIf="vm.searchResult.oxford?.first_known_use"
+                        class="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-surface-container-high/80">
+                    <span class="material-symbols-rounded text-sm text-secondary">calendar_today</span>
+                    <span><strong class="text-on-surface-variant">First known use:</strong> {{ vm.searchResult.oxford!.first_known_use }}</span>
+                  </span>
+                </div>
+              </div>
+
+              <div *ngIf="vm.getDictionaryLinks(vm.searchResult.oxford).length"
+                   class="bg-surface-container dark:bg-on-secondary-fixed/50 p-4 rounded-xl border border-surface-variant dark:border-outline">
+                <h4 class="font-label-md text-label-md text-on-surface dark:text-on-surface mb-3 flex items-center gap-2">
+                  <span class="material-symbols-rounded text-primary">link</span>
+                  Reference Links
+                </h4>
+                <div class="flex flex-col gap-2">
+                  <a *ngFor="let link of vm.getDictionaryLinks(vm.searchResult.oxford)"
+                     [href]="link.url"
+                     target="_blank"
+                     rel="noopener noreferrer"
+                     class="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-primary-container/30 hover:bg-primary-container/50 transition-colors group">
+                    <span class="font-label-sm text-label-sm text-on-primary-fixed-variant capitalize">{{ link.key }}</span>
+                    <span class="material-symbols-rounded text-sm text-primary group-hover:translate-x-0.5 transition-transform">open_in_new</span>
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Add to collection -->
+          <div *ngIf="!vm.searchResult.inCollection && vm.searchResult.oxford?.is_valid"
+               class="border-t border-surface-variant dark:border-outline pt-4 flex justify-end">
+            <button class="px-6 py-3 bg-primary text-on-primary rounded-xl font-label-md text-label-md hover:bg-surface-tint transition-all"
+                    (click)="vm.addWordToCollection(vm.searchResult.word)">
+              Add Word to Local Dictionary
+            </button>
+          </div>
+        </div>
+
+        <!-- Grid layout: Safe Words & Word Fact side-by-side -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4">
+          <!-- Safe Words to Explore (Span 2) -->
+          <div class="md:col-span-2">
+            <h4 class="font-label-md text-on-surface dark:text-on-surface mb-3 flex items-center gap-1.5 leading-none">
+              <span class="material-symbols-rounded text-secondary text-lg leading-none">explore</span>
+              Safe Words to Explore
+            </h4>
+            <p *ngIf="vm.safeExploreLoading" class="text-xs text-on-surface-variant italic mb-2">
+              Loading today's vm.words...
+            </p>
+            <p *ngIf="vm.safeExploreError && !vm.safeExploreLoading" class="text-xs text-on-surface-variant mb-2">
+              {{ vm.safeExploreError }}
+            </p>
+            <div class="flex flex-wrap gap-2">
+              <div *ngFor="let sugg of vm.quickSuggestions"
+                   (click)="vm.exploreWord(sugg.word)"
+                   class="px-3 py-1.5 clay-chip-white rounded-xl flex items-center gap-1.5 cursor-pointer">
+                <span class="material-symbols-rounded text-primary text-sm">{{ sugg.icon }}</span>
+                <span class="font-semibold text-xs text-on-surface dark:text-on-surface">{{ sugg.word | titlecase }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Word Fact of the Day (Span 1) -->
+          <div class="md:col-span-1 clay-card p-4 flex flex-col justify-center gap-1">
+            <div class="flex items-center gap-1.5 text-primary">
+              <span class="material-symbols-rounded icon-filled text-base">lightbulb</span>
+              <h4 class="font-bold text-xs uppercase tracking-wider text-on-surface dark:text-on-surface">Word Fact of the Day</h4>
+            </div>
+            <p class="font-body-md text-on-surface-variant dark:text-on-surface-variant text-xs leading-relaxed">
+              Did you know? The word <strong class="text-primary font-bold">"set"</strong> has over 430 distinct definitions in the English language!
+            </p>
+          </div>
+        </div>
+
+        <div class="clay-card p-6 mt-6 relative overflow-hidden">
+          <div class="relative z-10 flex flex-col md:flex-row gap-6 items-center">
+            <div class="flex-1 w-full">
+              <h3 class="font-headline-md text-headline-md text-primary dark:text-primary-fixed mb-2 flex items-center gap-2">
+                <span class="material-symbols-rounded icon-filled">extension</span>
+                Word Puzzle of the Day
+              </h3>
+              <p class="font-body-md text-on-surface-variant dark:text-on-surface-variant mb-4">
+                Unscramble today's word to learn something new.
+              </p>
+
+              <p *ngIf="vm.dailyScrambleLoading" class="text-sm text-on-surface-variant italic mb-4">
+                Loading today's puzzle...
+              </p>
+              <p *ngIf="vm.dailyScrambleError" class="text-sm text-error mb-4">{{ vm.dailyScrambleError }}</p>
+              
+              <!-- Scrambled letter boxes -->
+              <div *ngIf="!vm.dailyScrambleLoading && vm.dailyScrambleLetters.length" class="flex gap-2 mb-4 justify-start flex-wrap">
+                <div *ngFor="let letter of vm.dailyScrambleLetters"
+                     class="w-12 h-12 bg-surface dark:bg-surface-container border border-surface-variant dark:border-outline rounded-lg flex items-center justify-center font-headline-lg text-headline-lg text-primary shadow-sm font-bold">
+                  {{ letter }}
+                </div>
+              </div>
+              
+              <!-- Hint -->
+              <div *ngIf="vm.dailyScrambleHint" class="text-sm font-label-md text-outline flex items-center gap-1">
+                <span class="material-symbols-rounded text-sm">lightbulb</span> 
+                Hint: {{ vm.dailyScrambleHint }}
+              </div>
+            </div>
+
+            <!-- Puzzle solver controls -->
+            <div class="flex flex-col gap-2 w-full md:w-auto md:min-w-[200px]">
+              <div class="flex gap-2">
+                <input type="text" 
+                       placeholder="Solve..." 
+                       [(ngModel)]="vm.puzzleGuess"
+                       (keyup.enter)="vm.checkPuzzleGuess()"
+                       class="px-4 py-2.5 clay-input text-sm outline-none focus:border-primary text-on-surface dark:text-on-surface flex-1 w-full"/>
+                <button (click)="vm.checkPuzzleGuess()" 
+                        class="px-5 py-2.5 clay-primary font-bold transition-all text-sm">
+                  Check
+                </button>
+              </div>
+              <div *ngIf="vm.puzzleChecked" class="text-xs font-bold text-center mt-1">
+                <span *ngIf="vm.puzzleSuccess" class="text-green-600 dark:text-green-400">🎉 Correct! The word of the day is {{ vm.dailyScrambleWord | titlecase }}.</span>
+                <span *ngIf="!vm.puzzleSuccess" class="text-red-500 dark:text-red-400">❌ Incorrect guess. Try again!</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Daily Word Challenge Section -->
+        <div class="mt-6">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="font-headline-md text-headline-md text-on-surface dark:text-on-surface flex items-center gap-2">
+              <span class="material-symbols-rounded text-primary icon-filled">military_tech</span>
+              Word Challenge
+            </h3>
+            <span class="text-label-sm font-label-sm text-primary bg-primary-container px-3 py-1 rounded-full">Today's Quests</span>
+          </div>
+          <p *ngIf="vm.dailyWordChallengeError" class="text-xs text-on-surface-variant mb-2">{{ vm.dailyWordChallengeError }}</p>
+          <div *ngIf="vm.dailyWordChallengeLoading" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div *ngFor="let _ of [1,2,3,4]" class="clay-card p-4 flex flex-col gap-2 animate-pulse">
+              <div class="w-10 h-10 rounded-xl bg-surface-container-high mb-1"></div>
+              <div class="h-4 bg-surface-container-high rounded w-2/3"></div>
+              <div class="h-3 bg-surface-container-high rounded w-full"></div>
+            </div>
+          </div>
+          <div *ngIf="!vm.dailyWordChallengeLoading" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div *ngFor="let item of vm.dailyWordChallenge" 
+                 (click)="vm.exploreWord(item.word)"
+                 class="clay-card p-4 hover:scale-[1.02] transition-all cursor-pointer group flex flex-col gap-2">
+              <div class="w-10 h-10 rounded-xl bg-primary-container text-on-primary-container flex items-center justify-center mb-1">
+                <span class="material-symbols-rounded">{{ item.icon }}</span>
+              </div>
+              <h4 class="font-bold text-primary dark:text-primary-fixed text-sm uppercase tracking-wide flex justify-between items-center w-full">
+                {{ item.word }}
+                <span class="material-symbols-rounded text-xs text-outline group-hover:translate-x-1 transition-transform">arrow_forward</span>
+              </h4>
+              <p class="text-xs text-on-surface-variant dark:text-on-surface-variant italic text-left">"{{ item.definition }}"</p>
+            </div>
+          </div>
+        </div>
+</div>

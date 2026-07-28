@@ -1,0 +1,129 @@
+<div class="clay-card p-6 flex flex-col gap-6 animate-fade-in">
+<div>
+          <h3 class="font-headline-md font-bold text-on-surface dark:text-on-surface mb-1 flex items-center gap-2">
+            <span class="material-symbols-rounded text-primary icon-filled">settings</span>
+            Dictionary Management Dashboard
+          </h3>
+          <p class="text-body-md text-on-surface-variant dark:text-on-surface-variant">
+            Admin console for database maintenance, storage parameters, and custom wordlist imports.
+          </p>
+        </div>
+
+        <!-- Processing spinner -->
+        <div *ngIf="vm.isAdminProcessing" class="text-center p-8 bg-surface-container rounded-xl">
+          <span class="material-symbols-rounded text-4xl text-primary animate-spin mb-2">sync</span>
+          <p class="text-body-md text-on-surface-variant">Processing admin instructions...</p>
+        </div>
+
+        <div *ngIf="!vm.isAdminProcessing" class="flex flex-col gap-6">
+          
+          <!-- Storage Info Block -->
+          <div *ngIf="vm.storageInfo" class="bg-surface-container-low p-4 rounded-xl border border-surface-variant grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div>
+              <span class="text-xs text-outline block uppercase tracking-wider">Storage Provider</span>
+              <strong class="text-on-surface dark:text-on-surface font-bold text-sm">{{ vm.storageInfo.provider | uppercase }}</strong>
+            </div>
+            <div>
+              <span class="text-xs text-outline block uppercase tracking-wider">Connection Type</span>
+              <strong class="text-on-surface dark:text-on-surface font-bold text-sm">{{ vm.storageInfo.type }}</strong>
+            </div>
+            <div>
+              <span class="text-xs text-outline block uppercase tracking-wider">Region</span>
+              <strong class="text-on-surface dark:text-on-surface font-bold text-sm">{{ vm.storageInfo.region || 'Local' }}</strong>
+            </div>
+            <div>
+              <span class="text-xs text-outline block uppercase tracking-wider">Dictionary file</span>
+              <strong class="text-on-surface dark:text-on-surface font-bold text-sm">{{ vm.storageInfo.key || 'vm.words.txt' }}</strong>
+            </div>
+          </div>
+
+          <!-- Add / Remove Single Word Block -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6 border-t border-surface-variant dark:border-outline pt-6">
+            <!-- Add word form -->
+            <div class="flex flex-col gap-3">
+              <h4 class="font-label-md text-on-surface dark:text-on-surface font-bold flex items-center gap-1.5">
+                <span class="material-symbols-rounded text-primary">add_circle</span> Add Single Word
+              </h4>
+              <div class="flex gap-2">
+                <input type="text" [(ngModel)]="vm.newWordText" placeholder="e.g. empathy" class="p-3 clay-input text-body-md outline-none flex-1"/>
+                <button (click)="vm.addNewWord()" class="px-5 py-3 bg-primary hover:bg-surface-tint text-on-primary font-bold rounded-xl shadow-sm transition-colors">
+                  Add
+                </button>
+              </div>
+              <label class="flex items-center gap-2 cursor-pointer select-none">
+                <input type="checkbox" [(ngModel)]="vm.skipOxfordValidation" class="rounded text-primary"/>
+                <span class="text-xs text-on-surface-variant">Skip Oxford validation checks</span>
+              </label>
+            </div>
+
+            <!-- Remove word form -->
+            <div class="flex flex-col gap-3">
+              <h4 class="font-label-md text-on-surface dark:text-on-surface font-bold flex items-center gap-1.5">
+                <span class="material-symbols-rounded text-error">remove_circle</span> Remove Single Word
+              </h4>
+              <div class="flex gap-2">
+                <input type="text" [(ngModel)]="vm.wordToRemoveText" placeholder="e.g. hate" class="p-3 clay-input text-body-md outline-none flex-1"/>
+                <button (click)="vm.deleteWord()" class="px-5 py-3 bg-error hover:bg-red-700 text-white font-bold rounded-xl shadow-[0_4px_12px_rgba(239,68,68,0.2)] transition-colors">
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bulk Upload Word List Textarea -->
+          <div class="border-t border-surface-variant dark:border-outline pt-6 flex flex-col gap-3">
+            <h4 class="font-label-md text-on-surface dark:text-on-surface font-bold flex items-center gap-1.5">
+              <span class="material-symbols-rounded text-primary">upload_file</span> Bulk Import Word List
+            </h4>
+            <p class="text-xs text-outline">Paste comma-separated or newline-separated words to import them in bulk.</p>
+            <textarea [(ngModel)]="vm.bulkWordsText" rows="4" placeholder="e.g. apple, banana, cherry, date" class="w-full p-3 clay-input text-body-md outline-none resize-y font-mono"></textarea>
+            <div class="flex justify-end">
+              <button (click)="vm.uploadBulkWords()" class="px-6 py-3 clay-primary font-bold transition-colors">
+                Import Batch List
+              </button>
+            </div>
+          </div>
+
+          <!-- Database Maintenance triggers -->
+          <div class="border-t border-surface-variant dark:border-outline pt-6">
+            <h4 class="font-label-md text-on-surface dark:text-on-surface font-bold flex items-center gap-1.5 mb-3">
+              <span class="material-symbols-rounded text-primary">build</span> System Maintenance
+            </h4>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <!-- Sync Reload -->
+              <div class="bg-surface-container-low p-4 rounded-xl border border-surface-variant flex flex-col justify-between gap-3">
+                <div>
+                  <h5 class="text-sm font-bold text-on-surface dark:text-on-surface">Reload dictionary cache</h5>
+                  <p class="text-xs text-outline mt-1">Force reload dictionary word counts and values directly from file / Cloudflare R2 storage.</p>
+                </div>
+                <button (click)="vm.syncReloadStorage()" class="w-full py-2.5 bg-surface-container hover:bg-surface-container-high border border-surface-variant text-on-surface-variant font-bold rounded-lg text-xs transition-colors">
+                  Reload Dictionary
+                </button>
+              </div>
+
+              <!-- Sanitization Cleanup -->
+              <div class="bg-surface-container-low p-4 rounded-xl border border-surface-variant flex flex-col justify-between gap-3">
+                <div>
+                  <h5 class="text-sm font-bold text-on-surface dark:text-on-surface">Run database sanitization</h5>
+                  <p class="text-xs text-outline mt-1">Scans and removes all duplicate words, invalid characters, or formatting anomalies in the database.</p>
+                </div>
+                <button (click)="vm.runSanitizationCleanup()" class="w-full py-2.5 bg-tertiary text-white font-bold rounded-lg text-xs hover:bg-on-tertiary-fixed-variant transition-colors">
+                  Run Sanitization Sweep
+                </button>
+              </div>
+            </div>
+
+            <!-- Sanitization results report block -->
+            <div *ngIf="vm.cleanupSummary" class="mt-4 p-4 bg-tertiary-fixed/30 border border-tertiary-fixed text-on-tertiary-fixed-variant rounded-xl flex gap-3">
+              <span class="material-symbols-rounded text-2xl">verified_user</span>
+              <div>
+                <h5 class="text-sm font-bold">Sanitization Sweep Report:</h5>
+                <p class="text-xs mt-1">Found invalid words: <strong>{{ vm.cleanupSummary.found_invalid }}</strong></p>
+                <p class="text-xs">Permanently purged count: <strong>{{ vm.cleanupSummary.removed_count }}</strong></p>
+                <p class="text-xs">Summary action: <em>{{ vm.cleanupSummary.action_taken }}</em></p>
+              </div>
+            </div>
+          </div>
+        </div>
+</div>

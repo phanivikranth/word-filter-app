@@ -1,0 +1,177 @@
+<!-- Floating Decorative Elements -->
+<span class="material-symbols-rounded absolute top-32 left-[10%] text-secondary-fixed-dim text-6xl opacity-30 -z-10 rotate-12">cloud</span>
+<span class="material-symbols-rounded absolute top-1/3 right-[5%] text-tertiary-container text-5xl opacity-30 -z-10 -rotate-12">star</span>
+<span class="material-symbols-rounded absolute bottom-1/4 left-[5%] text-primary-fixed-dim text-7xl opacity-30 -z-10 rotate-45">eco</span>
+<span class="material-symbols-rounded absolute top-2/3 right-[15%] text-tertiary-fixed-dim text-5xl opacity-40 -z-10 -rotate-12">cruelty_free</span>
+
+<nav class="frosted-navbar shadow-[0_2px_12px_0_rgba(74,124,89,0.06)] w-full top-0 sticky z-50 transition-colors duration-300">
+  <div class="flex justify-between items-center px-gutter py-sm max-w-container-max mx-auto w-full">
+    <a class="flex items-center gap-1.5 group cursor-pointer" routerLink="/word-check">
+      <span class="material-symbols-rounded icon-filled text-primary dark:text-primary-fixed text-3xl leading-none transition-transform group-hover:scale-105 flex items-center justify-center w-9 h-9">shield</span>
+      <span class="text-headline-md font-extrabold text-primary dark:text-primary-fixed tracking-tight leading-none brand-font">Terse</span>
+    </a>
+
+    <ul class="hidden lg:flex items-center gap-md">
+      <li>
+        <a routerLink="/word-check" routerLinkActive="active" #rla1="routerLinkActive"
+           class="cursor-pointer pb-1 font-bold text-label-md transition-colors flex items-center gap-1"
+           [ngClass]="navLinkClass(rla1.isActive)">
+          <span class="material-symbols-rounded text-lg">search</span> Word Check
+        </a>
+      </li>
+      <li>
+        <a routerLink="/filters" routerLinkActive="active" #rla2="routerLinkActive"
+           class="cursor-pointer pb-1 font-bold text-label-md transition-colors flex items-center gap-1"
+           [ngClass]="navLinkClass(rla2.isActive)">
+          <span class="material-symbols-rounded text-lg">filter_alt</span> Filters
+        </a>
+      </li>
+      <li>
+        <a routerLink="/puzzles" routerLinkActive="active" #rla3="routerLinkActive"
+           class="cursor-pointer pb-1 font-bold text-label-md transition-colors flex items-center gap-1"
+           [ngClass]="navLinkClass(rla3.isActive)">
+          <span class="material-symbols-rounded text-lg">extension</span> Puzzles
+        </a>
+      </li>
+      <li>
+        <a routerLink="/games" routerLinkActive="active" #rla4="routerLinkActive"
+           class="cursor-pointer pb-1 font-bold text-label-md transition-colors flex items-center gap-1"
+           [ngClass]="navLinkClass(rla4.isActive)">
+          <span class="material-symbols-rounded text-lg">sports_esports</span> Games Zone
+        </a>
+      </li>
+      <li>
+        <a routerLink="/admin" routerLinkActive="active" #rla5="routerLinkActive"
+           class="cursor-pointer pb-1 font-bold text-label-md transition-colors flex items-center gap-1"
+           [ngClass]="navLinkClass(rla5.isActive)">
+          <span class="material-symbols-rounded text-lg">settings</span> Admin Control
+        </a>
+      </li>
+      <li>
+        <a routerLink="/performance" routerLinkActive="active" #rla6="routerLinkActive"
+           class="cursor-pointer pb-1 font-bold text-label-md transition-colors flex items-center gap-1"
+           [ngClass]="navLinkClass(rla6.isActive)">
+          <span class="material-symbols-rounded text-lg">bolt</span> Performance
+        </a>
+      </li>
+      <li>
+        <a routerLink="/profile" routerLinkActive="active" #rla7="routerLinkActive"
+           class="cursor-pointer pb-1 font-bold text-label-md transition-colors flex items-center gap-1"
+           [ngClass]="navLinkClass(rla7.isActive)">
+          <span class="material-symbols-rounded text-lg">person</span> Profile
+        </a>
+      </li>
+    </ul>
+
+    <div class="flex items-center gap-3">
+      <button class="w-10 h-10 flex items-center justify-center rounded-xl bg-surface-container hover:bg-surface-container-high text-primary dark:text-primary-fixed transition-colors shadow-sm"
+              (click)="vm.toggleTheme()"
+              title="Toggle Dark Mode">
+        <span class="material-symbols-rounded">{{ vm.isDarkMode ? 'light_mode' : 'dark_mode' }}</span>
+      </button>
+    </div>
+  </div>
+</nav>
+
+<div class="lg:hidden w-full bg-surface-container-low border-b border-surface-variant px-4 py-2 flex flex-wrap gap-2 justify-center">
+  <a routerLink="/word-check" routerLinkActive="active" #m1="routerLinkActive"
+     class="px-3 py-1.5 rounded-lg text-sm font-bold transition-all flex items-center gap-1"
+     [ngClass]="mobileTabClass(m1.isActive)">
+    <span class="material-symbols-rounded text-sm">search</span> Word Check
+  </a>
+  <a routerLink="/filters" routerLinkActive="active" #m2="routerLinkActive"
+     class="px-3 py-1.5 rounded-lg text-sm font-bold transition-all flex items-center gap-1"
+     [ngClass]="mobileTabClass(m2.isActive)">
+    <span class="material-symbols-rounded text-sm">filter_alt</span> Filters
+  </a>
+  <a routerLink="/puzzles" routerLinkActive="active" #m3="routerLinkActive"
+     class="px-3 py-1.5 rounded-lg text-sm font-bold transition-all flex items-center gap-1"
+     [ngClass]="mobileTabClass(m3.isActive)">
+    <span class="material-symbols-rounded text-sm">extension</span> Puzzles
+  </a>
+  <a routerLink="/games" routerLinkActive="active" #m4="routerLinkActive"
+     class="px-3 py-1.5 rounded-lg text-sm font-bold transition-all flex items-center gap-1"
+     [ngClass]="mobileTabClass(m4.isActive)">
+    <span class="material-symbols-rounded text-sm">sports_esports</span> Games
+  </a>
+  <a routerLink="/admin" routerLinkActive="active" #m5="routerLinkActive"
+     class="px-3 py-1.5 rounded-lg text-sm font-bold transition-all flex items-center gap-1"
+     [ngClass]="mobileTabClass(m5.isActive)">
+    <span class="material-symbols-rounded text-sm">settings</span> Admin
+  </a>
+  <a routerLink="/performance" routerLinkActive="active" #m6="routerLinkActive"
+     class="px-3 py-1.5 rounded-lg text-sm font-bold transition-all flex items-center gap-1"
+     [ngClass]="mobileTabClass(m6.isActive)">
+    <span class="material-symbols-rounded text-sm">bolt</span> Performance
+  </a>
+  <a routerLink="/profile" routerLinkActive="active" #m7="routerLinkActive"
+     class="px-3 py-1.5 rounded-lg text-sm font-bold transition-all flex items-center gap-1"
+     [ngClass]="mobileTabClass(m7.isActive)">
+    <span class="material-symbols-rounded text-sm">person</span> Profile
+  </a>
+</div>
+
+<main class="flex-grow pt-xl pb-xl px-gutter relative overflow-hidden">
+  <div class="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vw] bg-surface-container-high dark:bg-on-secondary-container/20 rounded-full blur-[100px] opacity-60 -z-10 pointer-events-none"></div>
+  <div class="absolute bottom-[10%] right-[-10%] w-[40vw] h-[40vw] bg-secondary-fixed dark:bg-on-tertiary-fixed-variant/20 rounded-full blur-[120px] opacity-40 -z-10 pointer-events-none"></div>
+
+  <div class="max-w-container-max mx-auto w-full grid grid-cols-1 lg:grid-cols-3 gap-6 relative z-10">
+    <div class="lg:col-span-2 flex flex-col gap-6">
+      <router-outlet></router-outlet>
+    </div>
+
+    <div class="lg:col-span-1 flex flex-col gap-6">
+      <div class="clay-card p-8 h-full flex flex-col gap-8">
+        <div>
+          <div class="flex items-center gap-2 mb-3">
+            <span class="material-symbols-rounded text-primary icon-filled">lightbulb</span>
+            <h3 class="font-headline-md font-bold text-on-surface dark:text-on-surface">Quick Tips</h3>
+          </div>
+          <ul class="space-y-3 font-body-md text-on-surface-variant dark:text-on-surface-variant">
+            <li class="flex items-start gap-2">
+              <span class="material-symbols-rounded text-primary text-sm mt-1">check_circle</span>
+              <span>Search for slang terms to understand their context.</span>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="material-symbols-rounded text-primary text-sm mt-1">check_circle</span>
+              <span>Discuss findings with your children openly.</span>
+            </li>
+          </ul>
+        </div>
+
+        <div class="bg-background dark:bg-surface/30 p-6 rounded-2xl border border-surface-variant dark:border-outline shadow-[inset_1px_1px_3px_rgba(0,0,0,0.06)]">
+          <div class="flex items-center gap-2 mb-3 text-primary leading-none">
+            <span class="material-symbols-rounded icon-filled text-lg leading-none">today</span>
+            <h4 class="font-label-md text-label-md uppercase tracking-wider font-bold leading-none">Daily Safe Word</h4>
+          </div>
+          <p *ngIf="vm.dailySafeWordLoading" class="font-body-md text-on-surface-variant dark:text-on-surface-variant italic">
+            Loading today's word…
+          </p>
+          <div *ngIf="!vm.dailySafeWordLoading && vm.dailySafeWord">
+            <div class="font-headline-lg text-headline-lg text-on-surface dark:text-on-surface mb-2 capitalize">
+              {{ vm.dailySafeWord }}
+            </div>
+            <p *ngIf="vm.dailySafeWordDefinition"
+               class="font-body-md text-on-surface-variant dark:text-on-surface-variant">
+              {{ vm.dailySafeWordDefinition }}
+            </p>
+          </div>
+          <p *ngIf="!vm.dailySafeWordLoading && !vm.dailySafeWord && vm.dailySafeWordError"
+             class="font-body-md text-on-surface-variant dark:text-on-surface-variant italic">
+            {{ vm.dailySafeWordError }}
+          </p>
+        </div>
+
+        <div class="bg-background dark:bg-surface/30 p-6 rounded-2xl border border-surface-variant dark:border-outline shadow-[inset_1px_1px_3px_rgba(0,0,0,0.06)] mt-auto">
+          <div class="flex items-center gap-2 mb-3">
+            <span class="material-symbols-rounded text-primary icon-filled">family_restroom</span>
+            <h4 class="font-label-md text-label-md uppercase tracking-wider text-on-surface dark:text-on-surface font-bold">Parental Safety Advice</h4>
+          </div>
+          <p class="font-body-md text-on-surface-variant dark:text-on-surface-variant text-sm">
+            Use this tool together with your child. It is a fantastic conversation starter about appropriate language, vocabulary, and digital boundaries!
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>

@@ -1,0 +1,110 @@
+<div class="clay-card p-6 flex flex-col gap-6 animate-fade-in">
+<div>
+          <h3 class="font-headline-md font-bold text-on-surface dark:text-on-surface mb-1 flex items-center gap-2">
+            <span class="material-symbols-rounded icon-filled text-primary">extension</span>
+            Advanced Puzzle Solver & Wildcards
+          </h3>
+          <p class="text-body-md text-on-surface-variant dark:text-on-surface-variant">
+            Solve crosswords and anagrams! Support wildcards: <code class="bg-surface-container-high px-1 py-0.5 rounded text-primary">?</code> (any letter), <code class="bg-surface-container-high px-1 py-0.5 rounded text-primary">&#64;</code> (vowels only), <code class="bg-surface-container-high px-1 py-0.5 rounded text-primary">#</code> (consonants only).
+          </p>
+        </div>
+
+        <div class="flex flex-col gap-4">
+          <!-- Pattern Letter Inputs Row -->
+          <div>
+            <div class="flex justify-between items-center mb-2">
+              <label class="block font-label-md text-on-surface dark:text-on-surface">Position-Specific Pattern Grid</label>
+              <div class="flex items-center gap-2">
+                <span class="text-sm text-outline">Word Length:</span>
+                <input type="number" min="2" max="15" [(ngModel)]="vm.puzzleLength" (change)="vm.onPuzzleLengthChange()" class="w-16 p-1.5 clay-input text-center font-bold text-on-surface dark:text-on-surface outline-none"/>
+              </div>
+            </div>
+
+            <!-- Word boxes input row -->
+            <div class="flex flex-wrap gap-2 justify-center py-2">
+              <input *ngFor="let letter of vm.letterBoxes; let i = index; trackBy: vm.trackByIndex"
+                     type="text"
+                     [value]="letter | uppercase"
+                     (input)="vm.updateLetter(i, $event)"
+                     placeholder="?"
+                     class="w-12 h-12 text-center font-headline-lg clay-input text-primary outline-none transition-all"/>
+            </div>
+            
+            <div class="text-center mt-1 text-sm text-outline flex justify-center items-center gap-2">
+              <span>Current Pattern: <strong>{{ vm.getCurrentPattern() }}</strong></span>
+            </div>
+          </div>
+
+          <!-- Other Constraints (Regex, Anagram) -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-surface-variant dark:border-outline pt-4">
+            <div>
+              <label class="block font-label-sm text-label-sm text-on-surface dark:text-on-surface mb-1.5">Regular Expression Pattern (Regex)</label>
+              <input type="text" [(ngModel)]="vm.puzzleRegex" placeholder="e.g. ^h.p[ae]y$" class="w-full p-3 clay-input text-body-md outline-none"/>
+              <span class="text-xs text-outline mt-1 block">Full Python regular expressions supported.</span>
+            </div>
+            <div>
+              <label class="block font-label-sm text-label-sm text-on-surface dark:text-on-surface mb-1.5 font-bold">Anagram Scrabble letters</label>
+              <div class="flex gap-2">
+                <input type="text" [(ngModel)]="vm.puzzleAnagram" placeholder="e.g. yaphp" class="w-full p-3 bg-background dark:bg-on-surface-variant border border-outline-variant dark:border-outline rounded-xl text-body-md outline-none focus:border-primary flex-1"/>
+                <label class="flex items-center gap-1.5 cursor-pointer select-none border border-surface-variant px-3 rounded-xl clay-btn">
+                  <input type="checkbox" [(ngModel)]="vm.puzzleAnagramExact" class="rounded text-primary"/>
+                  <span class="text-xs font-bold text-on-surface-variant">Exact</span>
+                </label>
+              </div>
+              <span class="text-xs text-outline mt-1 block">Find words that can be built from these letters pool.</span>
+            </div>
+          </div>
+
+          <!-- DataMuse word-finding (optional) -->
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 border-t border-surface-variant dark:border-outline pt-4">
+            <div>
+              <label class="block font-label-sm text-label-sm text-on-surface dark:text-on-surface mb-1.5">Means like (DataMuse)</label>
+              <input type="text" [(ngModel)]="vm.puzzleMeansLike" placeholder="e.g. happy" class="w-full p-3 clay-input text-body-md outline-none"/>
+            </div>
+            <div>
+              <label class="block font-label-sm text-label-sm text-on-surface dark:text-on-surface mb-1.5">Sounds like (DataMuse)</label>
+              <input type="text" [(ngModel)]="vm.puzzleSoundsLike" placeholder="e.g. jirraf" class="w-full p-3 clay-input text-body-md outline-none"/>
+            </div>
+            <div>
+              <label class="block font-label-sm text-label-sm text-on-surface dark:text-on-surface mb-1.5">Spelled like (DataMuse)</label>
+              <input type="text" [(ngModel)]="vm.puzzleSpelledLike" placeholder="e.g. sp???" class="w-full p-3 clay-input text-body-md outline-none"/>
+              <span class="text-xs text-outline mt-1 block">Use ? for unknown letters; merges with local results.</span>
+            </div>
+          </div>
+
+          <!-- Puzzle Buttons -->
+          <div class="flex flex-wrap gap-2 justify-end mt-2">
+            <button (click)="vm.clearInteractive()" class="px-6 py-3 clay-btn font-label-md text-label-md transition-colors">
+              Reset Puzzle
+            </button>
+            <button (click)="vm.randomizePattern()" class="px-6 py-3 clay-btn bg-tertiary-fixed text-on-tertiary-fixed hover:bg-tertiary-fixed-dim rounded-xl font-label-md text-label-md transition-colors">
+              Randomize Grid
+            </button>
+            <button (click)="vm.findMatchingWords()" class="px-8 py-3 clay-primary font-headline-md text-headline-md transition-all" [disabled]="vm.interactiveLoading">
+              <span *ngIf="!vm.interactiveLoading">Find Matches</span>
+              <span *ngIf="vm.interactiveLoading" class="animate-spin inline-block material-symbols-rounded">sync</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Result Area -->
+        <div *ngIf="vm.interactiveLoading" class="text-center p-8 border-t border-surface-variant dark:border-outline mt-4">
+          <span class="material-symbols-rounded text-4xl text-primary animate-spin mb-2">sync</span>
+          <p class="text-body-md text-on-surface-variant">Solving puzzle constraints...</p>
+        </div>
+
+        <div *ngIf="vm.interactiveError" class="bg-error-container text-on-error-container p-4 rounded-xl border border-error/10">
+          {{ vm.interactiveError }}
+        </div>
+
+        <div *ngIf="!vm.interactiveLoading && !vm.interactiveError && vm.interactiveWords.length > 0" class="border-t border-surface-variant dark:border-outline pt-4">
+          <h4 class="font-label-md text-on-surface dark:text-on-surface mb-3">Matching Solutions ({{ vm.interactiveWords.length }} found)</h4>
+          <div class="flex flex-wrap gap-2 max-h-[300px] overflow-y-auto p-2 bg-background dark:bg-on-surface-variant/30 border border-outline-variant dark:border-outline rounded-xl">
+            <span *ngFor="let word of vm.interactiveWords" 
+                  (click)="vm.copyWordToClipboard(word)"
+                  class="px-3.5 py-2 clay-btn rounded-lg text-body-md cursor-pointer">
+              {{ word }}
+            </span>
+          </div>
+        </div>
+</div>

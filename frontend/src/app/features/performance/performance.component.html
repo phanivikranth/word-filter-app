@@ -1,0 +1,149 @@
+<div class="clay-card p-6 flex flex-col gap-6 animate-fade-in">
+<div>
+          <h3 class="font-headline-md font-bold text-on-surface dark:text-on-surface mb-1 flex items-center gap-2">
+            <span class="material-symbols-rounded text-primary icon-filled">monitoring</span>
+            Enterprise Edge Gateway & Metrics Dashboard
+          </h3>
+          <p class="text-body-md text-on-surface-variant dark:text-on-surface-variant">
+            Live metrics, CPU/memory performance, Oxford API cache telemetry, and Cloudflare Worker routing logs.
+          </p>
+        </div>
+
+        <!-- Telemetry Loading State -->
+        <div *ngIf="vm.telemetryLoading && !vm.performanceStats" class="text-center p-8 bg-surface-container-low rounded-xl border border-surface-variant">
+          <span class="material-symbols-rounded text-4xl text-primary animate-spin mb-2">sync</span>
+          <p class="text-body-md text-on-surface-variant">Loading system and cache telemetry...</p>
+        </div>
+
+        <!-- Telemetry Connection Error State -->
+        <div *ngIf="vm.telemetryError" class="bg-error-container text-on-error-container p-4 rounded-xl border border-error/10 flex items-center gap-3 animate-fade-in">
+          <span class="material-symbols-rounded text-2xl text-error">error</span>
+          <div>
+            <p class="font-bold text-sm text-red-500 dark:text-red-400">Connection Error</p>
+            <p class="text-xs mt-0.5">{{ vm.telemetryError }}</p>
+          </div>
+        </div>
+
+        <!-- Telemetry Stats Cards Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6" *ngIf="vm.performanceStats">
+          
+          <!-- LEFT COLUMN (Telemetry & Status) -->
+          <div class="flex flex-col gap-6">
+            
+            <!-- Oxford Cache Card -->
+            <div *ngIf="vm.oxfordStats" class="bg-background dark:bg-surface/30 p-5 rounded-2xl border border-surface-variant dark:border-outline shadow-[inset_1px_1px_3px_rgba(0,0,0,0.06)] flex flex-col gap-4 animate-fade-in">
+              <h4 class="font-headline-sm font-bold text-primary dark:text-primary-fixed flex items-center gap-2 border-b border-surface-variant dark:border-outline pb-3">
+                <span class="material-symbols-rounded icon-filled">cached</span>
+                Dictionary Cache
+              </h4>
+              <div class="flex flex-col gap-3">
+                <div class="flex justify-between items-center border-b border-dashed border-outline-variant dark:border-outline/50 pb-2">
+                  <span class="text-sm font-semibold text-on-surface-variant dark:text-on-surface-variant">Cache Stats:</span>
+                  <span class="text-sm font-extrabold text-primary">{{ vm.oxfordStats.hits }} hits / {{ vm.oxfordStats.misses }} miss</span>
+                </div>
+                <div class="flex justify-between items-center pb-1">
+                  <span class="text-sm font-semibold text-on-surface-variant dark:text-on-surface-variant">Cached Items:</span>
+                  <span class="text-sm font-extrabold text-primary">{{ vm.oxfordStats.cached_words }} words</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- System Status Card -->
+            <div class="bg-background dark:bg-surface/30 p-5 rounded-2xl border border-surface-variant dark:border-outline shadow-[inset_1px_1px_3px_rgba(0,0,0,0.06)] flex flex-col gap-4 animate-fade-in">
+              <h4 class="font-headline-sm font-bold text-primary dark:text-primary-fixed flex items-center gap-2 border-b border-surface-variant dark:border-outline pb-3">
+                <span class="material-symbols-rounded icon-filled">bar_chart</span>
+                System Status
+              </h4>
+              <div class="flex flex-col gap-3">
+                <div class="flex justify-between items-center border-b border-dashed border-outline-variant dark:border-outline/50 pb-2">
+                  <span class="text-sm font-semibold text-on-surface-variant dark:text-on-surface-variant">Words Loaded:</span>
+                  <span class="text-sm font-extrabold text-primary">{{ vm.performanceStats.words_loaded | number }}</span>
+                </div>
+                <div class="flex justify-between items-center border-b border-dashed border-outline-variant dark:border-outline/50 pb-2">
+                  <span class="text-sm font-semibold text-on-surface-variant dark:text-on-surface-variant">Thread Pool Workers:</span>
+                  <span class="text-sm font-extrabold text-primary">{{ vm.performanceStats.thread_pool_workers }}</span>
+                </div>
+                <div class="flex justify-between items-center pb-1">
+                  <span class="text-sm font-semibold text-on-surface-variant dark:text-on-surface-variant">Process Pool Workers:</span>
+                  <span class="text-sm font-extrabold text-primary">{{ vm.performanceStats.process_pool_workers }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Memory Usage Card -->
+            <div class="bg-background dark:bg-surface/30 p-5 rounded-2xl border border-surface-variant dark:border-outline shadow-[inset_1px_1px_3px_rgba(0,0,0,0.06)] flex flex-col gap-4 animate-fade-in">
+              <h4 class="font-headline-sm font-bold text-primary dark:text-primary-fixed flex items-center gap-2 border-b border-surface-variant dark:border-outline pb-3">
+                <span class="material-symbols-rounded icon-filled">save</span>
+                Memory Usage
+              </h4>
+              <div class="flex flex-col gap-3">
+                <div class="flex justify-between items-center border-b border-dashed border-outline-variant dark:border-outline/50 pb-2">
+                  <span class="text-sm font-semibold text-on-surface-variant dark:text-on-surface-variant">Words List Size:</span>
+                  <span class="text-sm font-extrabold text-primary">{{ vm.performanceStats.memory_usage.words_list_size | number }}</span>
+                </div>
+                <div class="flex justify-between items-center pb-1">
+                  <span class="text-sm font-semibold text-on-surface-variant dark:text-on-surface-variant">Words Set Size:</span>
+                  <span class="text-sm font-extrabold text-primary">{{ vm.performanceStats.memory_usage.words_set_size | number }}</span>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- RIGHT COLUMN (Optimizations) -->
+          <div class="flex flex-col gap-6">
+            
+            <!-- Optimizations Card -->
+            <div class="bg-background dark:bg-surface/30 p-5 rounded-2xl border border-surface-variant dark:border-outline shadow-[inset_1px_1px_3px_rgba(0,0,0,0.06)] flex flex-col gap-4 h-full animate-fade-in">
+              <h4 class="font-headline-sm font-bold text-primary dark:text-primary-fixed flex items-center gap-2 border-b border-surface-variant dark:border-outline pb-3">
+                <span class="material-symbols-rounded icon-filled">rocket_launch</span>
+                Optimizations
+              </h4>
+              <div class="flex flex-col gap-4 pt-2">
+                <div *ngFor="let opt of vm.performanceStats.optimization_features" class="flex items-center gap-3">
+                  <span class="material-symbols-rounded text-green-600 dark:text-green-400 font-bold select-none text-[22px]">check_box</span>
+                  <span class="text-sm font-bold text-on-surface-variant dark:text-on-surface-variant">{{ opt }}</span>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+
+        <!-- Cloudflare Edge Worker Live Logging simulation -->
+        <div class="border-t border-surface-variant dark:border-outline pt-6">
+          <div class="flex justify-between items-center mb-3">
+            <h4 class="font-label-md text-on-surface dark:text-on-surface font-bold flex items-center gap-1.5">
+              <span class="material-symbols-rounded text-primary icon-filled">rss_feed</span> Cloudflare Edge Worker Gateway Logs
+            </h4>
+            <span class="inline-flex items-center gap-1 text-xs text-primary font-bold">
+              <span class="w-2.5 h-2.5 bg-green-500 rounded-full animate-ping"></span> Live updates active
+            </span>
+          </div>
+
+          <!-- Log logs entries console -->
+          <div class="w-full bg-slate-900 text-slate-300 p-4 rounded-xl font-mono text-xs overflow-y-auto max-h-[220px] flex flex-col gap-1.5 border border-slate-800 shadow-inner">
+            <div *ngFor="let log of vm.edgeLogs" class="flex flex-col md:flex-row md:justify-between border-b border-slate-800 pb-1 gap-1">
+              <div class="flex flex-wrap gap-1.5">
+                <span class="text-slate-500">[{{ log.time }}]</span>
+                <span class="text-slate-400">{{ log.ip }}</span>
+                <span class="font-bold" [ngClass]="log.method === 'POST' ? 'text-blue-400' : 'text-green-400'">{{ log.method }}</span>
+                <span class="text-teal-400">{{ log.path }}</span>
+              </div>
+              <div class="flex gap-2 justify-between">
+                <span class="font-bold" [ngClass]="log.status === 429 ? 'text-red-400' : 'text-slate-400'">{{ log.status }}</span>
+                <span class="italic font-bold" [ngClass]="log.status === 429 ? 'text-red-400' : 'text-slate-500'">{{ log.action }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Prometheus raw text output -->
+        <div *ngIf="vm.prometheusMetrics" class="border-t border-surface-variant dark:border-outline pt-6">
+          <h4 class="font-label-md text-on-surface dark:text-on-surface font-bold flex items-center gap-1.5 mb-2">
+            <span class="material-symbols-rounded text-primary">code</span> Prometheus `/metrics` Stream
+          </h4>
+          <pre class="w-full bg-slate-100 dark:bg-slate-800 p-4 rounded-xl text-slate-700 dark:text-slate-300 font-mono text-xs overflow-x-auto border border-surface-variant dark:border-outline">{{ vm.prometheusMetrics }}</pre>
+        </div>
+</div>

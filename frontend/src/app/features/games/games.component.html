@@ -1,0 +1,171 @@
+<div class="clay-card p-6 flex flex-col gap-6 animate-fade-in">
+<div class="flex justify-between items-center border-b border-surface-variant dark:border-outline pb-4">
+          <div>
+            <h3 class="font-headline-md font-bold text-on-surface dark:text-on-surface flex items-center gap-2">
+              <span class="material-symbols-rounded text-primary icon-filled">sports_esports</span>
+              Play Interactive Word Games
+            </h3>
+            <p class="text-sm text-on-surface-variant dark:text-on-surface-variant">Test your vocabulary with Wordle or Anagram Builder!</p>
+          </div>
+          <div class="flex gap-2">
+            <button class="px-4 py-2 text-sm font-bold transition-all"
+                    [ngClass]="vm.wordleActive ? 'clay-primary' : 'clay-btn'"
+                    (click)="vm.selectGameMode('wordle')">Wordle</button>
+            <button class="px-4 py-2 text-sm font-bold transition-all"
+                    [ngClass]="vm.anagramActive ? 'clay-primary' : 'clay-btn'"
+                    (click)="vm.selectGameMode('anagram')">Anagrams</button>
+          </div>
+        </div>
+
+        <!-- SUBGAME 1: WORDLE -->
+        <div *ngIf="vm.wordleActive" class="flex flex-col items-center gap-6">
+          <div class="text-center">
+            <h4 class="font-headline-md font-bold text-on-surface dark:text-on-surface flex justify-center items-center gap-2">
+              Wordle Challenge
+              <span class="text-xs font-normal text-primary bg-primary-container px-2 py-0.5 rounded-full">5 Letters</span>
+            </h4>
+            <p class="text-sm text-outline">Guess the secret safe word in 6 attempts.</p>
+          </div>
+
+          <!-- Error msg inside Wordle -->
+          <div *ngIf="vm.wordleError" class="bg-error-container text-on-error-container text-xs font-bold py-2 px-4 rounded-lg">
+            {{ vm.wordleError }}
+          </div>
+
+          <!-- Wordle Visual Grid -->
+          <div class="flex flex-col gap-1.5 justify-center py-2 max-w-[280px] w-full">
+            <div *ngFor="let row of vm.wordleGrid; let rIdx = index" class="flex gap-1.5 justify-center">
+              <div *ngFor="let cell of row" 
+                   class="w-12 h-12 flex items-center justify-center font-headline-lg border-2 rounded-xl font-bold select-none transition-all duration-300"
+                   [ngClass]="{
+                     'clay-input border-outline-variant': cell.status === 'empty',
+                     'clay-primary text-white': cell.status === 'correct',
+                     'bg-tertiary text-white shadow-md': cell.status === 'present',
+                     'bg-on-surface-variant text-white shadow-sm': cell.status === 'absent'
+                   }">
+                {{ cell.letter }}
+              </div>
+            </div>
+          </div>
+
+          <!-- Game Won/Lost Notification panel -->
+          <div *ngIf="vm.wordleStatus !== 'playing'" class="bg-surface-container p-4 rounded-xl border border-surface-variant w-full max-w-[320px] text-center flex flex-col gap-3">
+            <div class="font-headline-md font-bold" [ngClass]="vm.wordleStatus === 'won' ? 'text-primary' : 'text-error'">
+              {{ vm.wordleStatus === 'won' ? '🎉 YOU SOLVED IT!' : '💥 GAME OVER!' }}
+            </div>
+            <p class="text-body-md text-on-surface-variant">The secret word was: <strong class="text-primary">{{ vm.wordleWord }}</strong></p>
+            <button (click)="vm.startWordleGame()" class="px-6 py-2.5 bg-primary hover:bg-surface-tint text-on-primary rounded-xl font-label-md text-label-md transition-all shadow-sm">
+              Play Again
+            </button>
+          </div>
+
+          <!-- Keyboard component -->
+          <div class="w-full max-w-[420px] flex flex-col gap-1.5 select-none mt-2">
+            <!-- Row 1: Q W E R T Y U I O P -->
+            <div class="flex gap-1 justify-center">
+              <button *ngFor="let key of ['Q','W','E','R','T','Y','U','I','O','P']" 
+                      class="flex-1 min-h-[42px] rounded-lg font-bold text-sm transition-all text-center flex items-center justify-center"
+                      [ngClass]="{
+                        'clay-btn text-on-surface': !vm.wordleKeyboard[key],
+                        'clay-primary text-white': vm.wordleKeyboard[key] === 'correct',
+                        'bg-tertiary text-white shadow-md': vm.wordleKeyboard[key] === 'present',
+                        'bg-on-surface-variant text-white shadow-sm': vm.wordleKeyboard[key] === 'absent'
+                      }"
+                      (click)="vm.onWordleKeyInput(key)">{{ key }}</button>
+            </div>
+            <!-- Row 2: A S D F G H J K L -->
+            <div class="flex gap-1 justify-center px-4">
+              <button *ngFor="let key of ['A','S','D','F','G','H','J','K','L']" 
+                      class="flex-1 min-h-[42px] rounded-lg font-bold text-sm transition-all text-center flex items-center justify-center"
+                      [ngClass]="{
+                        'clay-btn text-on-surface': !vm.wordleKeyboard[key],
+                        'clay-primary text-white': vm.wordleKeyboard[key] === 'correct',
+                        'bg-tertiary text-white shadow-md': vm.wordleKeyboard[key] === 'present',
+                        'bg-on-surface-variant text-white shadow-sm': vm.wordleKeyboard[key] === 'absent'
+                      }"
+                      (click)="vm.onWordleKeyInput(key)">{{ key }}</button>
+            </div>
+            <!-- Row 3: ENTER Z X C V B N M BACKSPACE -->
+            <div class="flex gap-1 justify-center">
+              <button class="px-2 min-h-[42px] bg-surface-container hover:bg-surface-container-high rounded-lg font-bold text-xs" (click)="vm.onWordleKeyInput('ENTER')">ENTER</button>
+              <button *ngFor="let key of ['Z','X','C','V','B','N','M']" 
+                      class="flex-1 min-h-[42px] rounded-lg font-bold text-sm transition-all text-center flex items-center justify-center"
+                      [ngClass]="{
+                        'clay-btn text-on-surface': !vm.wordleKeyboard[key],
+                        'clay-primary text-white': vm.wordleKeyboard[key] === 'correct',
+                        'bg-tertiary text-white shadow-md': vm.wordleKeyboard[key] === 'present',
+                        'bg-on-surface-variant text-white shadow-sm': vm.wordleKeyboard[key] === 'absent'
+                      }"
+                      (click)="vm.onWordleKeyInput(key)">{{ key }}</button>
+              <button class="px-2 min-h-[42px] bg-surface-container hover:bg-surface-container-high rounded-lg font-bold text-xs" (click)="vm.onWordleKeyInput('BACKSPACE')">DEL</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- SUBGAME 2: ANAGRAM BUILDER -->
+        <div *ngIf="vm.anagramActive" class="flex flex-col gap-6">
+          <div class="text-center">
+            <h4 class="font-headline-md font-bold text-on-surface dark:text-on-surface flex justify-center items-center gap-2">
+              Anagram Explorer
+              <span class="text-xs font-normal text-tertiary bg-tertiary-container px-2 py-0.5 rounded-full">Scrabble mode</span>
+            </h4>
+            <p class="text-sm text-outline">Build as many valid words as possible using the letter pool!</p>
+          </div>
+
+          <!-- Letters Pool -->
+          <div class="flex justify-center gap-2 py-4">
+            <span *ngFor="let char of vm.anagramTargetLetters.split('')" 
+                  class="w-12 h-12 bg-tertiary-fixed text-on-tertiary-fixed border border-tertiary-fixed-dim rounded-xl font-headline-lg flex items-center justify-center font-bold shadow-sm">
+              {{ char }}
+            </span>
+          </div>
+
+          <!-- Game Controls / Input -->
+          <div class="flex flex-col items-center gap-4">
+            <div class="w-full max-w-sm flex gap-2">
+              <input type="text" 
+                     placeholder="Type a word..." 
+                     [(ngModel)]="vm.anagramWordInput"
+                     (keyup.enter)="vm.submitAnagramWord()"
+                     class="w-full p-3 bg-background dark:bg-on-surface-variant border border-outline rounded-xl font-headline-md text-center text-primary outline-none focus:border-secondary flex-1 uppercase"/>
+              <button (click)="vm.submitAnagramWord()" class="px-6 py-3 bg-primary hover:bg-surface-tint text-on-primary font-bold rounded-xl shadow-sm">
+                Submit
+              </button>
+            </div>
+            
+            <div *ngIf="vm.anagramError" class="bg-error-container text-on-error-container text-xs font-bold py-1.5 px-4 rounded-lg">
+              {{ vm.anagramError }}
+            </div>
+          </div>
+
+          <!-- Results & Scoring Panels -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6 border-t border-surface-variant dark:border-outline pt-6">
+            <!-- Left panel: found words -->
+            <div class="bg-surface-container-low p-4 rounded-xl border border-surface-variant">
+              <div class="flex justify-between items-center mb-3">
+                <span class="font-label-md text-on-surface dark:text-on-surface font-bold">Your Found Words ({{ vm.anagramUserWords.length }})</span>
+                <span class="text-primary font-bold text-headline-md">{{ vm.anagramScore }} pts</span>
+              </div>
+              <div class="flex flex-wrap gap-1.5 max-h-[160px] overflow-y-auto p-1 bg-white dark:bg-on-surface-variant/30 rounded-lg">
+                <span *ngFor="let w of vm.anagramUserWords" class="px-2.5 py-1 bg-primary-container text-on-primary-fixed-variant border border-primary-container/20 rounded-md font-label-sm text-sm font-bold">
+                  {{ w }}
+                </span>
+                <p *ngIf="vm.anagramUserWords.length === 0" class="w-full text-center text-outline text-xs p-4">No words found yet. Minimum 3 letters.</p>
+              </div>
+            </div>
+
+            <!-- Right panel: Solutions list -->
+            <div class="bg-surface-container-low p-4 rounded-xl border border-surface-variant flex flex-col gap-3">
+              <div class="flex justify-between items-center">
+                <span class="font-label-md text-on-surface dark:text-on-surface font-bold">Total Solutions</span>
+                <span class="text-sm text-outline font-bold">{{ vm.anagramValidSolutions.length }} possible</span>
+              </div>
+              <div class="flex-grow flex items-center justify-center">
+                <button (click)="vm.startAnagramGame()" class="px-4 py-2.5 bg-tertiary text-white rounded-lg text-xs font-bold hover:bg-on-tertiary-fixed-variant transition-colors shadow-sm flex items-center gap-1.5">
+                  <span class="material-symbols-rounded text-sm">sync</span> Next Letter Pool
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+</div>

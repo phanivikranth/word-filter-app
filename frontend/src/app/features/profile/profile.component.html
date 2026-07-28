@@ -18,8 +18,8 @@
             <div>
               <label class="block font-label-sm text-label-sm text-outline uppercase mb-1">Display Name</label>
               <div class="flex gap-2">
-                <input type="text" #nameInput [value]="vm.profileName" placeholder="Enter name" class="px-4 py-2.5 clay-input font-bold text-on-surface dark:text-on-surface outline-none flex-1"/>
-                <button (click)="vm.saveProfileName(nameInput.value)" class="px-5 py-2.5 clay-primary font-bold transition-all">
+                <input type="text" #nameInput [value]="profile.profileName" placeholder="Enter name" class="px-4 py-2.5 clay-input font-bold text-on-surface dark:text-on-surface outline-none flex-1"/>
+                <button (click)="profile.saveProfileName(nameInput.value)" class="px-5 py-2.5 clay-primary font-bold transition-all">
                   Save
                 </button>
               </div>
@@ -42,65 +42,65 @@
                 <label class="block font-label-sm text-xs text-outline uppercase mb-2">Accent Theme</label>
                 <div class="grid grid-cols-4 gap-2">
                   <!-- Theme: Blue -->
-                  <button (click)="vm.changeTheme('blue')" 
+                  <button (click)="theme.changeTheme('blue')" 
                           class="p-2.5 clay-btn flex flex-col items-center gap-1 transition-all rounded-xl"
-                          [ngClass]="vm.activeTheme === 'blue' ? 'border-primary bg-primary/5' : 'border-surface-variant dark:border-outline'">
+                          [ngClass]="theme.activeTheme === 'blue' ? 'border-primary bg-primary/5' : 'border-surface-variant dark:border-outline'">
                     <span class="w-5 h-5 rounded-full bg-[#0284c7] border border-white dark:border-outline-variant shadow-sm"></span>
                     <span class="text-[10px] font-bold text-on-surface dark:text-on-surface">Blue</span>
                   </button>
 
                   <!-- Theme: Green -->
-                  <button (click)="vm.changeTheme('green')" 
+                  <button (click)="theme.changeTheme('green')" 
                           class="p-2.5 clay-btn flex flex-col items-center gap-1 transition-all rounded-xl"
-                          [ngClass]="vm.activeTheme === 'green' ? 'border-primary bg-primary/5' : 'border-surface-variant dark:border-outline'">
+                          [ngClass]="theme.activeTheme === 'green' ? 'border-primary bg-primary/5' : 'border-surface-variant dark:border-outline'">
                     <span class="w-5 h-5 rounded-full bg-[#15803d] border border-white dark:border-outline-variant shadow-sm"></span>
                     <span class="text-[10px] font-bold text-on-surface dark:text-on-surface">Green</span>
                   </button>
 
                   <!-- Theme: Indigo -->
-                  <button (click)="vm.changeTheme('indigo')" 
+                  <button (click)="theme.changeTheme('indigo')" 
                           class="p-2.5 clay-btn flex flex-col items-center gap-1 transition-all rounded-xl"
-                          [ngClass]="vm.activeTheme === 'indigo' ? 'border-primary bg-primary/5' : 'border-surface-variant dark:border-outline'">
+                          [ngClass]="theme.activeTheme === 'indigo' ? 'border-primary bg-primary/5' : 'border-surface-variant dark:border-outline'">
                     <span class="w-5 h-5 rounded-full bg-[#4f46e5] border border-white dark:border-outline-variant shadow-sm"></span>
                     <span class="text-[10px] font-bold text-on-surface dark:text-on-surface">Indigo</span>
                   </button>
 
                   <!-- Theme: Amber -->
-                  <button (click)="vm.changeTheme('amber')" 
+                  <button (click)="theme.changeTheme('amber')" 
                           class="p-2.5 clay-btn flex flex-col items-center gap-1 transition-all rounded-xl"
-                          [ngClass]="vm.activeTheme === 'amber' ? 'border-primary bg-primary/5' : 'border-surface-variant dark:border-outline'">
+                          [ngClass]="theme.activeTheme === 'amber' ? 'border-primary bg-primary/5' : 'border-surface-variant dark:border-outline'">
                     <span class="w-5 h-5 rounded-full bg-[#d97706] border border-white dark:border-outline-variant shadow-sm"></span>
                     <span class="text-[10px] font-bold text-on-surface dark:text-on-surface">Amber</span>
                   </button>
 
                   <!-- Theme: Rose -->
-                  <button (click)="vm.changeTheme('rose')" 
+                  <button (click)="theme.changeTheme('rose')" 
                           class="p-2.5 clay-btn flex flex-col items-center gap-1 transition-all rounded-xl"
-                          [ngClass]="vm.activeTheme === 'rose' ? 'border-primary bg-primary/5' : 'border-surface-variant dark:border-outline'">
+                          [ngClass]="theme.activeTheme === 'rose' ? 'border-primary bg-primary/5' : 'border-surface-variant dark:border-outline'">
                     <span class="w-5 h-5 rounded-full bg-[#db2777] border border-white dark:border-outline-variant shadow-sm"></span>
                     <span class="text-[10px] font-bold text-on-surface dark:text-on-surface">Rose</span>
                   </button>
 
                   <!-- Theme: Violet -->
-                  <button (click)="vm.changeTheme('violet')" 
+                  <button (click)="theme.changeTheme('violet')" 
                           class="p-2.5 clay-btn flex flex-col items-center gap-1 transition-all rounded-xl"
-                          [ngClass]="vm.activeTheme === 'violet' ? 'border-primary bg-primary/5' : 'border-surface-variant dark:border-outline'">
+                          [ngClass]="theme.activeTheme === 'violet' ? 'border-primary bg-primary/5' : 'border-surface-variant dark:border-outline'">
                     <span class="w-5 h-5 rounded-full bg-[#7c3aed] border border-white dark:border-outline-variant shadow-sm"></span>
                     <span class="text-[10px] font-bold text-on-surface dark:text-on-surface">Violet</span>
                   </button>
 
                   <!-- Theme: Slate -->
-                  <button (click)="vm.changeTheme('slate')" 
+                  <button (click)="theme.changeTheme('slate')" 
                           class="p-2.5 clay-btn flex flex-col items-center gap-1 transition-all rounded-xl"
-                          [ngClass]="vm.activeTheme === 'slate' ? 'border-primary bg-primary/5' : 'border-surface-variant dark:border-outline'">
+                          [ngClass]="theme.activeTheme === 'slate' ? 'border-primary bg-primary/5' : 'border-surface-variant dark:border-outline'">
                     <span class="w-5 h-5 rounded-full bg-[#475569] border border-white dark:border-outline-variant shadow-sm"></span>
                     <span class="text-[10px] font-bold text-on-surface dark:text-on-surface">Slate</span>
                   </button>
 
                   <!-- Theme: Teal -->
-                  <button (click)="vm.changeTheme('teal')" 
+                  <button (click)="theme.changeTheme('teal')" 
                           class="p-2.5 clay-btn flex flex-col items-center gap-1 transition-all rounded-xl"
-                          [ngClass]="vm.activeTheme === 'teal' ? 'border-primary bg-primary/5' : 'border-surface-variant dark:border-outline'">
+                          [ngClass]="theme.activeTheme === 'teal' ? 'border-primary bg-primary/5' : 'border-surface-variant dark:border-outline'">
                     <span class="w-5 h-5 rounded-full bg-[#0d9488] border border-white dark:border-outline-variant shadow-sm"></span>
                     <span class="text-[10px] font-bold text-on-surface dark:text-on-surface">Teal</span>
                   </button>
@@ -111,10 +111,10 @@
               <div>
                 <label class="block font-label-sm text-xs text-outline uppercase mb-2">Display Font</label>
                 <div class="grid grid-cols-2 gap-2">
-                  <button *ngFor="let opt of vm.fontOptions"
-                          (click)="vm.changeFont(opt.id)"
+                  <button *ngFor="let opt of theme.fontOptions"
+                          (click)="theme.changeFont(opt.id)"
                           class="py-2 px-3 clay-btn flex items-center justify-center gap-2 transition-all rounded-xl"
-                          [ngClass]="vm.activeFont === opt.id ? 'border-primary bg-primary/5' : 'border-surface-variant dark:border-outline'">
+                          [ngClass]="theme.activeFont === opt.id ? 'border-primary bg-primary/5' : 'border-surface-variant dark:border-outline'">
                     <span class="text-base font-bold brand-font" [ngClass]="opt.cssClass">Ag</span>
                     <span class="text-xs font-bold text-on-surface dark:text-on-surface">{{ opt.name }}</span>
                   </button>
@@ -129,19 +129,19 @@
               <div class="flex items-center justify-between p-3.5 bg-background dark:bg-surface/30 border border-surface-variant dark:border-outline rounded-2xl shadow-[inset_1px_1px_3px_rgba(0,0,0,0.06)]">
                 <div class="flex items-center gap-3">
                   <span class="material-symbols-rounded text-xl text-on-surface dark:text-on-surface">
-                    {{ vm.isDarkMode ? 'dark_mode' : 'light_mode' }}
+                    {{ theme.isDarkMode ? 'dark_mode' : 'light_mode' }}
                   </span>
                   <div>
                     <div class="text-xs font-bold text-on-surface dark:text-on-surface">Dark Theme Mode</div>
                     <div class="text-[10px] text-on-surface-variant dark:text-on-surface-variant">Switch color appearance</div>
                   </div>
                 </div>
-                <button (click)="vm.toggleTheme()" 
+                <button (click)="theme.toggleTheme()" 
                         class="relative inline-flex h-5 w-10 items-center rounded-full transition-colors focus:outline-none bg-surface-container-high dark:bg-surface-container-highest"
-                        [ngClass]="vm.isDarkMode ? 'bg-primary dark:bg-primary-fixed' : 'bg-outline-variant'">
+                        [ngClass]="theme.isDarkMode ? 'bg-primary dark:bg-primary-fixed' : 'bg-outline-variant'">
                   <span class="sr-only">Toggle Dark Mode</span>
                   <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform"
-                        [ngClass]="vm.isDarkMode ? 'translate-x-5' : 'translate-x-1'"></span>
+                        [ngClass]="theme.isDarkMode ? 'translate-x-5' : 'translate-x-1'"></span>
                 </button>
               </div>
 
@@ -156,12 +156,12 @@
                     <div class="text-[10px] text-on-surface-variant dark:text-on-surface-variant">Toggle puffy 3D styling</div>
                   </div>
                 </div>
-                <button (click)="vm.toggleClaymorphic()" 
+                <button (click)="theme.toggleClaymorphic()" 
                         class="relative inline-flex h-5 w-10 items-center rounded-full transition-colors focus:outline-none bg-surface-container-high dark:bg-surface-container-highest"
-                        [ngClass]="vm.isClaymorphic ? 'bg-primary dark:bg-primary-fixed' : 'bg-outline-variant'">
+                        [ngClass]="theme.isClaymorphic ? 'bg-primary dark:bg-primary-fixed' : 'bg-outline-variant'">
                   <span class="sr-only">Toggle Claymorphic Style</span>
                   <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform"
-                        [ngClass]="vm.isClaymorphic ? 'translate-x-5' : 'translate-x-1'"></span>
+                        [ngClass]="theme.isClaymorphic ? 'translate-x-5' : 'translate-x-1'"></span>
                 </button>
               </div>
 
@@ -178,11 +178,11 @@
           <div class="grid grid-cols-2 gap-4">
             <div class="bg-surface-container-low p-4 rounded-xl border border-surface-variant dark:border-outline">
               <span class="text-xs text-outline block uppercase tracking-wider font-bold">Active Theme</span>
-              <strong class="text-headline-md text-primary font-bold capitalize">{{ vm.activeTheme }}</strong>
+              <strong class="text-headline-md text-primary font-bold capitalize">{{ theme.activeTheme }}</strong>
             </div>
             <div class="bg-surface-container-low p-4 rounded-xl border border-surface-variant dark:border-outline">
               <span class="text-xs text-outline block uppercase tracking-wider font-bold">Preferred Mode</span>
-              <strong class="text-headline-md text-primary font-bold">{{ vm.isDarkMode ? 'Dark' : 'Light' }}</strong>
+              <strong class="text-headline-md text-primary font-bold">{{ theme.isDarkMode ? 'Dark' : 'Light' }}</strong>
             </div>
           </div>
         </div>

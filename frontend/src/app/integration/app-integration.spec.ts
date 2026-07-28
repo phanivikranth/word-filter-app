@@ -1,594 +1,358 @@
-import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { TestBed } from '@angular/core/testing';
 import { ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
-import { of } from 'rxjs';
+import { RouterTestingModule } from '@angular/router/testing';
 
 import { AppComponent } from '../app.component';
+import { AppModule } from '../app.module';
 import { WordService } from '../services/word.service';
+import { WordStatsService } from '../core/services/word-stats.service';
+import { WordCheckService } from '../features/word-check/word-check.service';
+import { FiltersService } from '../features/filters/filters.service';
+import { PuzzleSolverService } from '../features/puzzles/puzzle-solver.service';
 import { environment } from '../../environments/environment';
-import { 
-  MOCK_WORD_STATS, 
-  MOCK_WORDS_LIST, 
+import {
+  MOCK_WORD_STATS,
+  MOCK_WORDS_LIST,
   MOCK_BASIC_SEARCH_RESULT,
   MOCK_ADD_WORD_RESPONSE_SUCCESS,
   MOCK_INTERACTIVE_WORDS,
-  TEST_SCENARIOS
 } from '../testing/test-data';
-import { 
-  setInputValue, 
-  clickElement, 
-  getTextContent, 
-  hasElement,
-  expectElement,
-  AsyncTestHelper,
-  createComponentStateHelper
-} from '../testing/test-utils';
+import { AsyncTestHelper } from '../testing/test-utils';
+import { MaterialModule } from '../material.module';
 
 /**
- * Integration tests for AppComponent with real WordService
- * These tests verify the full integration between component and service layers
+ * Integration tests for modular feature services and app bootstrap.
+ * Exercises real WordService HTTP wiring through focused services (post-facade split).
  */
-describe('AppComponent Integration Tests', () => {
-  let component: AppComponent;
-  let fixture: ComponentFixture<AppComponent>;
-  let httpMock: HttpTestingController;
-  let wordService: WordService;
+describe('Terse app integration', () => {
+  describe('App bootstrap', () => {
+    it('should create the root component with app shell', async () => {
+      await TestBed.configureTestingModule({
+        imports: [AppModule, RouterTestingModule, HttpClientTestingModule, NoopAnimationsModule],
+      }).compileComponents();
 
-  beforeEach(async () => {
-    await TestBed.configureTestingModule({
-      declarations: [AppComponent],
-      imports: [ReactiveFormsModule, FormsModule, HttpClientTestingModule, NoopAnimationsModule],
-      providers: [WordService]
-    }).compileComponents();
-
-    fixture = TestBed.createComponent(AppComponent);
-    component = fixture.componentInstance;
-    httpMock = TestBed.inject(HttpTestingController);
-    wordService = TestBed.inject(WordService);
+      const fixture = TestBed.createComponent(AppComponent);
+      expect(fixture.componentInstance).toBeTruthy();
+      expect(fixture.nativeElement.querySelector('app-shell')).toBeTruthy();
+    });
   });
 
-    afterEach(() => {
-      try {
-        httpMock.verify();
-      } catch (e) {
-        // Gracefully handle any remaining HTTP requests
-        console.warn('Some HTTP requests were not handled in test cleanup');
-      }
+  describe('WordStatsService', () => {
+    let httpMock: HttpTestingController;
+    let wordStats: WordStatsService;
+
+    beforeEach(() => {
+      TestBed.configureTestingModule({
+        imports: [HttpClientTestingModule],
+        providers: [WordService, WordStatsService],
+      });
+      httpMock = TestBed.inject(HttpTestingController);
+      wordStats = TestBed.inject(WordStatsService);
     });
 
-  describe('Component Initialization Integration', () => {
-    it('should load word statistics and initial words on component init', async () => {
-      // Trigger component initialization
-      fixture.detectChanges();
+    afterEach(() => {
+      httpMock.verify();
+    });
 
-      // Expect stats request
+    it('should load word statistics from the API', async () => {
+      wordStats.load();
+
       const statsReq = httpMock.expectOne(`${environment.apiUrl}/words/stats`);
       expect(statsReq.request.method).toBe('GET');
       statsReq.flush(MOCK_WORD_STATS);
 
-      // Expect initial words request
-      const wordsReq = httpMock.expectOne(req => req.url.startsWith(`${environment.apiUrl}/words`));
-      expect(wordsReq.request.method).toBe('GET');
-      wordsReq.flush(MOCK_WORDS_LIST);
+      await AsyncTestHelper.waitFor(() => wordStats.wordStats !== null);
 
-      // Wait for component to update
-      await AsyncTestHelper.waitForPropertyChange(component, 'loading', false);
-
-      // Verify component state
-      expect(component.wordStats).toEqual(MOCK_WORD_STATS);
-      expect(component.words).toEqual(MOCK_WORDS_LIST);
-      expect(component.loading).toBeFalse();
-      expect(component.error).toBe('');
+      expect(wordStats.wordStats).toEqual(MOCK_WORD_STATS);
+      expect(wordStats.loadError).toBe('');
     });
 
-    it('should handle initialization errors gracefully', async () => {
-      fixture.detectChanges();
+    it('should record an error when stats loading fails', async () => {
+      wordStats.load();
 
-      // Stats request fails
       const statsReq = httpMock.expectOne(`${environment.apiUrl}/words/stats`);
       statsReq.flush('Server error', { status: 500, statusText: 'Internal Server Error' });
 
-      // Words request fails
-      const wordsReq = httpMock.expectOne(req => req.url.startsWith(`${environment.apiUrl}/words`));
-      wordsReq.flush('Server error', { status: 500, statusText: 'Internal Server Error' });
+      await AsyncTestHelper.waitFor(() => wordStats.loadError !== '');
 
-      await AsyncTestHelper.waitForPropertyChange(component, 'loading', false);
-
-      expect(component.error).toBe('Failed to search words. Make sure the backend is running.');
-      expect(component.wordStats).toBeNull();
+      expect(wordStats.wordStats).toBeNull();
+      expect(wordStats.loadError).toBe('Failed to load word statistics');
     });
   });
 
-  describe('Advanced Filter Integration', () => {
+  describe('FiltersService', () => {
+    let httpMock: HttpTestingController;
+    let filters: FiltersService;
+
     beforeEach(() => {
-      fixture.detectChanges();
-      // Clear initial requests
-      httpMock.expectOne(`${environment.apiUrl}/words/stats`).flush(MOCK_WORD_STATS);
-      httpMock.expectOne(req => req.url.startsWith(`${environment.apiUrl}/words`)).flush(MOCK_WORDS_LIST);
+      TestBed.configureTestingModule({
+        imports: [HttpClientTestingModule, ReactiveFormsModule],
+        providers: [WordService, FiltersService],
+      });
+      httpMock = TestBed.inject(HttpTestingController);
+      filters = TestBed.inject(FiltersService);
     });
 
-    it('should perform advanced filtering with real API calls', async () => {
-      const stateHelper = createComponentStateHelper(component, fixture);
-      
-      // Set form values
-      component.filterForm.patchValue({
+    afterEach(() => {
+      httpMock.verify();
+    });
+
+    it('should perform advanced filtering via /words/advanced-filter', async () => {
+      filters.filterForm.patchValue({
         contains: 'pro',
         starts_with: 'p',
-        min_length: 7
+        min_length: 7,
       });
 
-      // Trigger search
-      stateHelper.callMethod('searchWords');
+      filters.searchWords();
 
-      // Expect filtered request
-      const filterReq = httpMock.expectOne(req => {
-        return req.url.startsWith(`${environment.apiUrl}/words`) &&
-               req.params.get('contains') === 'pro' &&
-               req.params.get('starts_with') === 'p' &&
-               req.params.get('min_length') === '7';
+      const filterReq = httpMock.expectOne((req) => {
+        return (
+          req.url === `${environment.apiUrl}/words/advanced-filter` &&
+          req.params.get('contains') === 'pro' &&
+          req.params.get('starts_with') === 'p' &&
+          req.params.get('minLength') === '7'
+        );
       });
 
       const filteredWords = ['programming', 'professional', 'project'];
-      filterReq.flush(filteredWords);
+      filterReq.flush({ words: filteredWords, source: 'word_game_db', mode: 'filter' });
 
-      await AsyncTestHelper.waitForPropertyChange(component, 'loading', false);
+      await AsyncTestHelper.waitForPropertyChange(filters, 'loading', false);
 
-      expect(component.words).toEqual(filteredWords);
-      expect(component.error).toBe('');
+      expect(filters.words).toEqual(filteredWords);
+      expect(filters.advancedFilterMode).toBe('filter');
+      expect(filters.error).toBe('');
     });
 
-    it('should clear filters and reload all words', async () => {
-      // Set some filters first
-      component.filterForm.patchValue({
+    it('should clear filters and reload with default limit', async () => {
+      filters.filterForm.patchValue({
         contains: 'test',
-        min_length: 5
+        min_length: 5,
       });
 
-      // Clear filters
-      component.clearFilters();
+      filters.clearFilters();
 
-      // Expect request for all words
-      const clearReq = httpMock.expectOne(req => {
-        return req.url.startsWith(`${environment.apiUrl}/words`) &&
-               req.params.get('limit') === '100' &&
-               !req.params.has('contains') &&
-               !req.params.has('min_length');
+      const clearReq = httpMock.expectOne((req) => {
+        return (
+          req.url === `${environment.apiUrl}/words/advanced-filter` &&
+          req.params.get('limit') === '100' &&
+          !req.params.has('contains') &&
+          !req.params.has('minLength')
+        );
       });
 
-      clearReq.flush(MOCK_WORDS_LIST);
+      clearReq.flush({ words: MOCK_WORDS_LIST, source: 'word_game_db', mode: 'browse' });
 
-      await AsyncTestHelper.waitForPropertyChange(component, 'loading', false);
+      await AsyncTestHelper.waitForPropertyChange(filters, 'loading', false);
 
-      expect(component.filterForm.get('contains')?.value).toBeNull();
-      expect(component.filterForm.get('min_length')?.value).toBeNull();
-      expect(component.filterForm.get('limit')?.value).toBe(100);
-      expect(component.words).toEqual(MOCK_WORDS_LIST);
+      expect(filters.filterForm.get('contains')?.value).toBeNull();
+      expect(filters.filterForm.get('min_length')?.value).toBeNull();
+      expect(filters.filterForm.get('limit')?.value).toBe(100);
+      expect(filters.words).toEqual(MOCK_WORDS_LIST);
+    });
+
+    it('should handle network errors during filter search', async () => {
+      filters.searchWords();
+
+      const req = httpMock.expectOne((r) => r.url.includes('/words/advanced-filter'));
+      req.error(new ErrorEvent('Network error'));
+
+      await AsyncTestHelper.waitForPropertyChange(filters, 'loading', false);
+
+      expect(filters.loading).toBeFalse();
+      expect(filters.error).toContain('Failed to search words');
     });
   });
 
-  describe('Basic Search Integration', () => {
+  describe('WordCheckService', () => {
+    let httpMock: HttpTestingController;
+    let wordCheck: WordCheckService;
+
     beforeEach(() => {
-      fixture.detectChanges();
-      // Clear initial requests
-      httpMock.expectOne(`${environment.apiUrl}/words/stats`).flush(MOCK_WORD_STATS);
-      httpMock.expectOne(req => req.url.startsWith(`${environment.apiUrl}/words`)).flush(MOCK_WORDS_LIST);
-      
-      component.searchMode = 'basic';
+      TestBed.configureTestingModule({
+        imports: [
+          HttpClientTestingModule,
+          RouterTestingModule,
+          NoopAnimationsModule,
+          MaterialModule,
+        ],
+        providers: [WordService, WordCheckService, WordStatsService],
+      });
+      httpMock = TestBed.inject(HttpTestingController);
+      wordCheck = TestBed.inject(WordCheckService);
     });
 
-    it('should perform complete basic search workflow', async () => {
-      component.searchWord = 'example';
+    afterEach(() => {
+      try {
+        httpMock.verify();
+      } catch {
+        // WordCheck flows may leave snackbar-only side effects; ignore stray requests in edge cases
+      }
+    });
 
-      // Trigger search
-      component.searchWordBasic();
+    it('should perform basic search (collection check + Oxford validate)', async () => {
+      wordCheck.searchWord = 'example';
+      wordCheck.searchWordBasic();
 
-      // Handle collection check
       const checkReq = httpMock.expectOne(`${environment.apiUrl}/words/check`);
       checkReq.flush({ exists: true });
 
-      // Handle Oxford validation
       const oxfordReq = httpMock.expectOne(`${environment.apiUrl}/words/validate`);
       oxfordReq.flush({
         success: true,
         word: 'example',
         oxford_validation: MOCK_BASIC_SEARCH_RESULT.oxford,
-        message: 'Word validated'
+        message: 'Word validated',
       });
 
-      await AsyncTestHelper.waitForPropertyChange(component, 'isSearching', false);
+      await AsyncTestHelper.waitForPropertyChange(wordCheck, 'isSearching', false);
 
-      expect(component.searchResult).toEqual(MOCK_BASIC_SEARCH_RESULT);
-      expect(component.searchError).toBe('');
+      expect(wordCheck.searchResult?.word).toBe('example');
+      expect(wordCheck.searchResult?.inCollection).toBeTrue();
+      expect(wordCheck.searchResult?.oxford).toEqual(MOCK_BASIC_SEARCH_RESULT.oxford);
+      expect(wordCheck.searchError).toBe('');
     });
 
-    it('should handle word not in collection scenario', async () => {
-      component.searchWord = 'uncommon';
+    it('should handle word not in collection with valid Oxford entry', async () => {
+      wordCheck.searchWord = 'uncommon';
+      wordCheck.searchWordBasic();
 
-      component.searchWordBasic();
+      httpMock.expectOne(`${environment.apiUrl}/words/check`).flush({ exists: false });
 
-      // Collection check returns false
-      const checkReq = httpMock.expectOne(`${environment.apiUrl}/words/check`);
-      checkReq.flush({ exists: false });
-
-      // Oxford validation succeeds
-      const oxfordReq = httpMock.expectOne(`${environment.apiUrl}/words/validate`);
-      oxfordReq.flush({
+      httpMock.expectOne(`${environment.apiUrl}/words/validate`).flush({
         success: true,
         word: 'uncommon',
         oxford_validation: {
-          ...MOCK_BASIC_SEARCH_RESULT.oxford,
-          word: 'uncommon'
+          ...MOCK_BASIC_SEARCH_RESULT.oxford!,
+          word: 'uncommon',
         },
-        message: 'Word validated'
+        message: 'Word validated',
       });
 
-      await AsyncTestHelper.waitForPropertyChange(component, 'isSearching', false);
+      await AsyncTestHelper.waitForPropertyChange(wordCheck, 'isSearching', false);
 
-      expect(component.searchResult?.inCollection).toBeFalse();
-      expect(component.searchResult?.oxford).toBeTruthy();
+      expect(wordCheck.searchResult?.inCollection).toBeFalse();
+      expect(wordCheck.searchResult?.oxford).toBeTruthy();
     });
 
-    it('should fallback to filtered search when check endpoint fails', async () => {
-      component.searchWord = 'fallback';
+    it('should add a word and refresh search + stats', async () => {
+      const newWord = 'newword';
 
-      component.searchWordBasic();
+      wordCheck.addWordToCollection(newWord);
 
-      // Collection check fails
-      const checkReq = httpMock.expectOne(`${environment.apiUrl}/words/check`);
-      checkReq.flush('Not found', { status: 404, statusText: 'Not Found' });
-
-      // Fallback to filtered search
-      const fallbackReq = httpMock.expectOne(req => {
-        return req.url.startsWith(`${environment.apiUrl}/words`) &&
-               req.params.get('contains') === 'fallback' &&
-               req.params.get('limit') === '1';
-      });
-      fallbackReq.flush(['fallback']);
-
-      // Oxford validation
-      const oxfordReq = httpMock.expectOne(`${environment.apiUrl}/words/validate`);
-      oxfordReq.flush({
-        success: true,
-        word: 'fallback',
-        oxford_validation: {
-          ...MOCK_BASIC_SEARCH_RESULT.oxford,
-          word: 'fallback'
-        },
-        message: 'Success'
-      });
-
-      await AsyncTestHelper.waitForPropertyChange(component, 'isSearching', false);
-
-      expect(component.searchResult?.inCollection).toBeTruthy();
-      expect(component.searchResult?.oxford).toBeTruthy();
-    });
-  });
-
-  describe('Interactive Search Integration', () => {
-    beforeEach(() => {
-      fixture.detectChanges();
-      // Clear initial requests
-      httpMock.expectOne(`${environment.apiUrl}/words/stats`).flush(MOCK_WORD_STATS);
-      httpMock.expectOne(req => req.url.startsWith(`${environment.apiUrl}/words`)).flush(MOCK_WORDS_LIST);
-    });
-
-    it('should perform interactive pattern search', async () => {
-      // Set up interactive search
-      component.interactiveWordLength = 5;
-      component.onWordLengthChange();
-      component.letterBoxes = ['a', '', '', 'l', 'e'];
-
-      // Trigger search
-      component.findMatchingWords();
-
-      // Expect interactive search request
-      const interactiveReq = httpMock.expectOne(req => {
-        return req.url.startsWith(`${environment.apiUrl}/words/interactive`) &&
-               req.params.get('length') === '5' &&
-               req.params.get('pattern') === 'a??le';
-      });
-
-      interactiveReq.flush(MOCK_INTERACTIVE_WORDS);
-
-      await AsyncTestHelper.waitForPropertyChange(component, 'interactiveLoading', false);
-
-      expect(component.interactiveWords).toEqual(MOCK_INTERACTIVE_WORDS);
-      expect(component.interactiveError).toBe('');
-    });
-
-    it('should handle no matching words scenario', async () => {
-      component.interactiveWordLength = 4;
-      component.onWordLengthChange();
-      component.letterBoxes = ['z', 'x', 'q', 'w'];
-
-      component.findMatchingWords();
-
-      const interactiveReq = httpMock.expectOne(req => {
-        return req.url.includes('/words/interactive') &&
-               req.params.get('pattern') === 'zxqw';
-      });
-
-      interactiveReq.flush([]);
-
-      await AsyncTestHelper.waitForPropertyChange(component, 'interactiveLoading', false);
-
-      expect(component.interactiveWords).toEqual([]);
-      expect(component.interactiveError).toBe('No words found matching your pattern.');
-    });
-  });
-
-  describe('Word Addition Integration', () => {
-    beforeEach(() => {
-      fixture.detectChanges();
-      // Clear initial requests
-      httpMock.expectOne(`${environment.apiUrl}/words/stats`).flush(MOCK_WORD_STATS);
-      httpMock.expectOne(req => req.url.startsWith(`${environment.apiUrl}/words`)).flush(MOCK_WORDS_LIST);
-    });
-
-    it('should add word and refresh data', async () => {
-      const newWord = 'testword';
-
-      // Trigger word addition
-      component.addWordToCollection(newWord);
-
-      // Handle add word request
       const addReq = httpMock.expectOne(`${environment.apiUrl}/words/add-validated`);
       expect(addReq.request.body).toEqual({ word: newWord, skip_oxford: false });
       addReq.flush(MOCK_ADD_WORD_RESPONSE_SUCCESS);
 
-      // Wait for any async operations to complete
-      await new Promise(resolve => setTimeout(resolve, 100));
+      const checkReq = httpMock.expectOne(`${environment.apiUrl}/words/check`);
+      checkReq.flush({ exists: true });
 
-      // Word was added successfully (indicated by successful HTTP response)
-      // Test passes if no exceptions were thrown
+      const oxfordReq = httpMock.expectOne(`${environment.apiUrl}/words/validate`);
+      oxfordReq.flush({
+        success: true,
+        word: newWord,
+        oxford_validation: MOCK_BASIC_SEARCH_RESULT.oxford,
+        message: 'Valid word',
+      });
 
-      // Verify the add operation completed successfully by checking no errors
-      expect(component.error).toBe('');
+      const statsReq = httpMock.expectOne(`${environment.apiUrl}/words/stats`);
+      statsReq.flush({ ...MOCK_WORD_STATS, total_words: MOCK_WORD_STATS.total_words + 1 });
+
+      await AsyncTestHelper.waitForPropertyChange(wordCheck, 'isSearching', false);
+
+      expect(wordCheck.searchResult?.inCollection).toBeTrue();
     });
 
-    it('should handle word addition failure', async () => {
-      const invalidWord = 'invalid123';
-
-      component.addWordToCollection(invalidWord);
+    it('should surface validation message when add fails', async () => {
+      wordCheck.addWordToCollection('invalid123');
 
       const addReq = httpMock.expectOne(`${environment.apiUrl}/words/add-validated`);
       addReq.flush({
         success: false,
-        word: invalidWord,
+        word: 'invalid123',
         was_new: false,
-        message: 'Invalid word format'
+        message: 'Invalid word format',
       });
 
-      await AsyncTestHelper.waitFor(() => component.searchError !== '');
+      await AsyncTestHelper.waitFor(() => wordCheck.searchError !== '');
 
-      expect(component.searchError).toBe('Invalid word format');
+      expect(wordCheck.searchError).toBe('Invalid word format');
     });
   });
 
-  describe('Error Handling Integration', () => {
+  describe('PuzzleSolverService', () => {
+    let httpMock: HttpTestingController;
+    let puzzles: PuzzleSolverService;
+
     beforeEach(() => {
-      fixture.detectChanges();
-      // Clear initial requests
-      httpMock.expectOne(`${environment.apiUrl}/words/stats`).flush(MOCK_WORD_STATS);
-      httpMock.expectOne(req => req.url.startsWith(`${environment.apiUrl}/words`)).flush(MOCK_WORDS_LIST);
+      TestBed.configureTestingModule({
+        imports: [HttpClientTestingModule, NoopAnimationsModule, MaterialModule],
+        providers: [WordService, PuzzleSolverService],
+      });
+      httpMock = TestBed.inject(HttpTestingController);
+      puzzles = TestBed.inject(PuzzleSolverService);
     });
 
-    it('should handle network connectivity issues', async () => {
-      // Trigger search that will fail
-      component.searchWords();
+    afterEach(() => {
+      httpMock.verify();
+    });
 
-      const req = httpMock.expectOne(req => req.url.startsWith(`${environment.apiUrl}/words`));
+    it('should find matching words via /words/puzzle', async () => {
+      puzzles.puzzleLength = 5;
+      puzzles.onPuzzleLengthChange();
+      puzzles.letterBoxes = ['a', '', '', 'l', 'e'];
+
+      puzzles.findMatchingWords();
+
+      const puzzleReq = httpMock.expectOne((req) => {
+        return (
+          req.url === `${environment.apiUrl}/words/puzzle` &&
+          req.params.get('pattern') === 'a??le'
+        );
+      });
+
+      puzzleReq.flush(MOCK_INTERACTIVE_WORDS);
+
+      await AsyncTestHelper.waitForPropertyChange(puzzles, 'interactiveLoading', false);
+
+      expect(puzzles.interactiveWords).toEqual(MOCK_INTERACTIVE_WORDS);
+      expect(puzzles.interactiveError).toBe('');
+    });
+
+    it('should report when no puzzle matches are found', async () => {
+      puzzles.puzzleLength = 4;
+      puzzles.onPuzzleLengthChange();
+      puzzles.letterBoxes = ['z', 'x', 'q', 'w'];
+
+      puzzles.findMatchingWords();
+
+      const puzzleReq = httpMock.expectOne((req) => req.url.includes('/words/puzzle'));
+      puzzleReq.flush([]);
+
+      await AsyncTestHelper.waitForPropertyChange(puzzles, 'interactiveLoading', false);
+
+      expect(puzzles.interactiveWords).toEqual([]);
+      expect(puzzles.interactiveError).toBe('No words found matching your pattern.');
+    });
+
+    it('should handle puzzle API failures', async () => {
+      puzzles.puzzleLength = 5;
+      puzzles.onPuzzleLengthChange();
+      puzzles.letterBoxes = ['t', 'e', 's', 't', 's'];
+
+      puzzles.findMatchingWords();
+
+      const req = httpMock.expectOne((r) => r.url.includes('/words/puzzle'));
       req.error(new ErrorEvent('Network error'));
 
-      await AsyncTestHelper.waitForPropertyChange(component, 'loading', false);
+      await AsyncTestHelper.waitForPropertyChange(puzzles, 'interactiveLoading', false);
 
-      expect(component.error).toBe('Failed to search words. Make sure the backend is running.');
-      expect(component.loading).toBeFalse();
-    });
-
-    it('should handle server errors gracefully', async () => {
-      component.searchWord = 'test';
-      
-      // Initially, search should not be in progress
-      expect(component.isSearching).toBeFalse();
-      
-      // Start the search (this sets isSearching to true)
-      component.searchWordBasic();
-      
-      // Search should now be in progress
-      expect(component.isSearching).toBeTrue();
-
-      // Mock the first HTTP error response (POST /words/check)
-      const checkReq = httpMock.expectOne(req => 
-        req.url === `${environment.apiUrl}/words/check` && req.method === 'POST'
+      expect(puzzles.interactiveError).toBe(
+        'Failed to find words. Make sure the backend is running.'
       );
-      checkReq.flush('Server error', { status: 500, statusText: 'Internal Server Error' });
-
-      // Mock the fallback HTTP error response (GET /words with fallback)
-      const fallbackReq = httpMock.expectOne(req => 
-        req.url.startsWith(`${environment.apiUrl}/words`) && req.method === 'GET'
-      );
-      fallbackReq.flush('Fallback error', { status: 500, statusText: 'Internal Server Error' });
-
-      // Wait for the error observable to complete and the component to update
-      await new Promise(resolve => setTimeout(resolve, 250));
-
-      // After error handling, search should no longer be in progress
-      expect(component.isSearching).toBeFalse();
-      expect(component.searchError).toContain('Failed to search word');
-    });
-
-    it('should handle timeout scenarios', async () => {
-      component.interactiveWordLength = 5;
-      component.letterBoxes = ['t', 'e', 's', 't', 's'];
-      component.findMatchingWords();
-
-      const req = httpMock.expectOne(req => req.url.includes('/words/interactive'));
-      req.error(new ErrorEvent('Timeout'));
-
-      await AsyncTestHelper.waitForPropertyChange(component, 'interactiveLoading', false);
-
-      expect(component.interactiveError).toBe('Failed to find words. Make sure the backend is running.');
-    });
-  });
-
-  describe('End-to-End User Workflows', () => {
-    beforeEach(() => {
-      fixture.detectChanges();
-      // Clear initial requests
-      httpMock.expectOne(`${environment.apiUrl}/words/stats`).flush(MOCK_WORD_STATS);
-      httpMock.expectOne(req => req.url.startsWith(`${environment.apiUrl}/words`)).flush(MOCK_WORDS_LIST);
-    });
-
-    it('should complete advanced search workflow', async () => {
-      // User sets up filters
-      component.filterForm.patchValue({
-        contains: 'ing',
-        min_length: 8,
-        limit: 20
-      });
-
-      // User triggers search
-      component.onFilterChange();
-
-      // System makes API call
-      const searchReq = httpMock.expectOne(req => {
-        return req.url.startsWith(`${environment.apiUrl}/words`) &&
-               req.params.get('contains') === 'ing' &&
-               req.params.get('min_length') === '8' &&
-               req.params.get('limit') === '20';
-      });
-
-      const searchResults = ['programming', 'engineering', 'interesting'];
-      searchReq.flush(searchResults);
-
-      await AsyncTestHelper.waitForPropertyChange(component, 'loading', false);
-
-      // Verify results
-      expect(component.words).toEqual(searchResults);
-      expect(component.error).toBe('');
-
-      // User clears filters
-      component.clearFilters();
-
-      // System reloads all words
-      const clearReq = httpMock.expectOne(req => {
-        return req.url.startsWith(`${environment.apiUrl}/words`) &&
-               req.params.get('limit') === '100';
-      });
-      clearReq.flush(MOCK_WORDS_LIST);
-
-      await AsyncTestHelper.waitForPropertyChange(component, 'loading', false);
-      
-      expect(component.words).toEqual(MOCK_WORDS_LIST);
-    });
-
-    it('should complete basic search to word addition workflow', async () => {
-      // User searches for a word
-      component.searchMode = 'basic';
-      component.searchWord = 'newword';
-      component.searchWordBasic();
-
-      // Word is not in collection
-      const checkReq = httpMock.expectOne(`${environment.apiUrl}/words/check`);
-      checkReq.flush({ exists: false });
-
-      // But Oxford validation succeeds
-      const oxfordReq = httpMock.expectOne(`${environment.apiUrl}/words/validate`);
-      oxfordReq.flush({
-        success: true,
-        word: 'newword',
-        oxford_validation: MOCK_BASIC_SEARCH_RESULT.oxford,
-        message: 'Valid word'
-      });
-
-      await AsyncTestHelper.waitForPropertyChange(component, 'isSearching', false);
-
-      expect(component.searchResult?.inCollection).toBeFalse();
-      expect(component.searchResult?.oxford).toBeTruthy();
-
-      // User decides to add the word
-      component.addWordToCollection('newword');
-
-      // System adds word
-      const addReq = httpMock.expectOne(`${environment.apiUrl}/words/add-validated`);
-      addReq.flush({
-        success: true,
-        word: 'newword',
-        was_new: true,
-        message: 'Word added successfully'
-      });
-
-      // System refreshes search to show updated status
-      const refreshCheckReq = httpMock.expectOne(`${environment.apiUrl}/words/check`);
-      refreshCheckReq.flush({ exists: true });
-
-      const refreshOxfordReq = httpMock.expectOne(`${environment.apiUrl}/words/validate`);
-      refreshOxfordReq.flush({
-        success: true,
-        word: 'newword',
-        oxford_validation: MOCK_BASIC_SEARCH_RESULT.oxford,
-        message: 'Valid word'
-      });
-
-      // System refreshes stats
-      const statsReq = httpMock.expectOne(`${environment.apiUrl}/words/stats`);
-      statsReq.flush({ ...MOCK_WORD_STATS, total_words: MOCK_WORD_STATS.total_words + 1 });
-
-      await AsyncTestHelper.waitForPropertyTruthy(component, 'searchResult');
-
-      // Verify word is now in collection
-      expect(component.searchResult?.inCollection).toBeTruthy();
-      expect(component.wordStats?.total_words).toBe(MOCK_WORD_STATS.total_words + 1);
-    });
-
-    it('should complete interactive search workflow', async () => {
-      // User sets word length
-      component.interactiveWordLength = 5;
-      component.onWordLengthChange();
-
-      expect(component.letterBoxes.length).toBe(5);
-
-      // User fills in some letters
-      component.letterBoxes = ['p', '', 'o', '', 'e'];
-
-      // User searches for matching words
-      component.findMatchingWords();
-
-      const searchReq = httpMock.expectOne(req => {
-        return req.url.includes('/words/interactive') &&
-               req.params.get('pattern') === 'p?o?e';
-      });
-
-      searchReq.flush(['phone', 'prose']);
-
-      await AsyncTestHelper.waitForPropertyChange(component, 'interactiveLoading', false);
-
-      expect(component.interactiveWords).toEqual(['phone', 'prose']);
-
-      // User explores one of the words
-      component.exploreWord('phone');
-
-      expect(component.searchMode).toBe('basic');
-      expect(component.searchWord).toBe('phone');
-
-      // System performs basic search for the explored word
-      const exploreCheckReq = httpMock.expectOne(`${environment.apiUrl}/words/check`);
-      exploreCheckReq.flush({ exists: true });
-
-      const exploreOxfordReq = httpMock.expectOne(`${environment.apiUrl}/words/validate`);
-      exploreOxfordReq.flush({
-        success: true,
-        word: 'phone',
-        oxford_validation: { ...MOCK_BASIC_SEARCH_RESULT.oxford, word: 'phone' },
-        message: 'Success'
-      });
-
-      await AsyncTestHelper.waitForPropertyChange(component, 'isSearching', false);
-
-      expect(component.searchResult?.word).toBe('phone');
-      expect(component.searchResult?.inCollection).toBeTruthy();
     });
   });
 });

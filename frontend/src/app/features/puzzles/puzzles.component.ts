@@ -1,14 +1,10 @@
-import { Component, OnInit } from '@angular/core';
-import { TerseAppFacade } from '../../core/facades/terse-app.facade';
+import { Component } from '@angular/core';
+import { PuzzleSolverService } from './puzzle-solver.service';
 
 @Component({
   selector: 'app-puzzles',
   templateUrl: './puzzles.component.html',
 })
-export class PuzzlesComponent implements OnInit {
-  constructor(public vm: TerseAppFacade) {}
-
-  ngOnInit(): void {
-    this.vm.onPuzzleLengthChange();
-  }
+export class PuzzlesComponent {
+  constructor(public vm: PuzzleSolverService) {}
 }

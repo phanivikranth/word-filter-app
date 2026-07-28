@@ -1,19 +1,25 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
-import { TerseAppFacade } from '../../core/facades/terse-app.facade';
+import { ThemeService } from '../../core/services/theme.service';
+import { DailyContentService } from '../../core/services/daily-content.service';
+import { AppInitService } from '../../core/services/app-init.service';
 
 @Component({
   selector: 'app-shell',
   templateUrl: './app-shell.component.html',
 })
 export class AppShellComponent implements OnInit, OnDestroy {
-  constructor(public vm: TerseAppFacade) {}
+  constructor(
+    public theme: ThemeService,
+    public daily: DailyContentService,
+    private readonly appInit: AppInitService
+  ) {}
 
   ngOnInit(): void {
-    this.vm.initApp();
+    this.appInit.init();
   }
 
   ngOnDestroy(): void {
-    this.vm.ngOnDestroy();
+    this.appInit.ngOnDestroy();
   }
 
   navLinkClass(active: boolean): string {

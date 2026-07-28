@@ -65,9 +65,9 @@
 
     <div class="flex items-center gap-3">
       <button class="w-10 h-10 flex items-center justify-center rounded-xl bg-surface-container hover:bg-surface-container-high text-primary dark:text-primary-fixed transition-colors shadow-sm"
-              (click)="vm.toggleTheme()"
+              (click)="theme.toggleTheme()"
               title="Toggle Dark Mode">
-        <span class="material-symbols-rounded">{{ vm.isDarkMode ? 'light_mode' : 'dark_mode' }}</span>
+        <span class="material-symbols-rounded">{{ theme.isDarkMode ? 'light_mode' : 'dark_mode' }}</span>
       </button>
     </div>
   </div>
@@ -144,21 +144,21 @@
             <span class="material-symbols-rounded icon-filled text-lg leading-none">today</span>
             <h4 class="font-label-md text-label-md uppercase tracking-wider font-bold leading-none">Daily Safe Word</h4>
           </div>
-          <p *ngIf="vm.dailySafeWordLoading" class="font-body-md text-on-surface-variant dark:text-on-surface-variant italic">
+          <p *ngIf="daily.dailySafeWordLoading" class="font-body-md text-on-surface-variant dark:text-on-surface-variant italic">
             Loading today's word…
           </p>
-          <div *ngIf="!vm.dailySafeWordLoading && vm.dailySafeWord">
+          <div *ngIf="!daily.dailySafeWordLoading && daily.dailySafeWord">
             <div class="font-headline-lg text-headline-lg text-on-surface dark:text-on-surface mb-2 capitalize">
-              {{ vm.dailySafeWord }}
+              {{ daily.dailySafeWord }}
             </div>
-            <p *ngIf="vm.dailySafeWordDefinition"
+            <p *ngIf="daily.dailySafeWordDefinition"
                class="font-body-md text-on-surface-variant dark:text-on-surface-variant">
-              {{ vm.dailySafeWordDefinition }}
+              {{ daily.dailySafeWordDefinition }}
             </p>
           </div>
-          <p *ngIf="!vm.dailySafeWordLoading && !vm.dailySafeWord && vm.dailySafeWordError"
+          <p *ngIf="!daily.dailySafeWordLoading && !daily.dailySafeWord && daily.dailySafeWordError"
              class="font-body-md text-on-surface-variant dark:text-on-surface-variant italic">
-            {{ vm.dailySafeWordError }}
+            {{ daily.dailySafeWordError }}
           </p>
         </div>
 

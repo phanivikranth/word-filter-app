@@ -302,14 +302,14 @@
               <span class="material-symbols-rounded text-secondary text-lg leading-none">explore</span>
               Safe Words to Explore
             </h4>
-            <p *ngIf="vm.safeExploreLoading" class="text-xs text-on-surface-variant italic mb-2">
-              Loading today's vm.words...
+            <p *ngIf="daily.safeExploreLoading" class="text-xs text-on-surface-variant italic mb-2">
+              Loading today's words...
             </p>
-            <p *ngIf="vm.safeExploreError && !vm.safeExploreLoading" class="text-xs text-on-surface-variant mb-2">
-              {{ vm.safeExploreError }}
+            <p *ngIf="daily.safeExploreError && !daily.safeExploreLoading" class="text-xs text-on-surface-variant mb-2">
+              {{ daily.safeExploreError }}
             </p>
             <div class="flex flex-wrap gap-2">
-              <div *ngFor="let sugg of vm.quickSuggestions"
+              <div *ngFor="let sugg of daily.quickSuggestions"
                    (click)="vm.exploreWord(sugg.word)"
                    class="px-3 py-1.5 clay-chip-white rounded-xl flex items-center gap-1.5 cursor-pointer">
                 <span class="material-symbols-rounded text-primary text-sm">{{ sugg.icon }}</span>
@@ -341,23 +341,23 @@
                 Unscramble today's word to learn something new.
               </p>
 
-              <p *ngIf="vm.dailyScrambleLoading" class="text-sm text-on-surface-variant italic mb-4">
+              <p *ngIf="daily.dailyScrambleLoading" class="text-sm text-on-surface-variant italic mb-4">
                 Loading today's puzzle...
               </p>
-              <p *ngIf="vm.dailyScrambleError" class="text-sm text-error mb-4">{{ vm.dailyScrambleError }}</p>
+              <p *ngIf="daily.dailyScrambleError" class="text-sm text-error mb-4">{{ daily.dailyScrambleError }}</p>
               
               <!-- Scrambled letter boxes -->
-              <div *ngIf="!vm.dailyScrambleLoading && vm.dailyScrambleLetters.length" class="flex gap-2 mb-4 justify-start flex-wrap">
-                <div *ngFor="let letter of vm.dailyScrambleLetters"
+              <div *ngIf="!daily.dailyScrambleLoading && daily.dailyScrambleLetters.length" class="flex gap-2 mb-4 justify-start flex-wrap">
+                <div *ngFor="let letter of daily.dailyScrambleLetters"
                      class="w-12 h-12 bg-surface dark:bg-surface-container border border-surface-variant dark:border-outline rounded-lg flex items-center justify-center font-headline-lg text-headline-lg text-primary shadow-sm font-bold">
                   {{ letter }}
                 </div>
               </div>
               
               <!-- Hint -->
-              <div *ngIf="vm.dailyScrambleHint" class="text-sm font-label-md text-outline flex items-center gap-1">
+              <div *ngIf="daily.dailyScrambleHint" class="text-sm font-label-md text-outline flex items-center gap-1">
                 <span class="material-symbols-rounded text-sm">lightbulb</span> 
-                Hint: {{ vm.dailyScrambleHint }}
+                Hint: {{ daily.dailyScrambleHint }}
               </div>
             </div>
 
@@ -366,17 +366,17 @@
               <div class="flex gap-2">
                 <input type="text" 
                        placeholder="Solve..." 
-                       [(ngModel)]="vm.puzzleGuess"
-                       (keyup.enter)="vm.checkPuzzleGuess()"
+                       [(ngModel)]="daily.puzzleGuess"
+                       (keyup.enter)="daily.checkPuzzleGuess()"
                        class="px-4 py-2.5 clay-input text-sm outline-none focus:border-primary text-on-surface dark:text-on-surface flex-1 w-full"/>
-                <button (click)="vm.checkPuzzleGuess()" 
+                <button (click)="daily.checkPuzzleGuess()" 
                         class="px-5 py-2.5 clay-primary font-bold transition-all text-sm">
                   Check
                 </button>
               </div>
-              <div *ngIf="vm.puzzleChecked" class="text-xs font-bold text-center mt-1">
-                <span *ngIf="vm.puzzleSuccess" class="text-green-600 dark:text-green-400">🎉 Correct! The word of the day is {{ vm.dailyScrambleWord | titlecase }}.</span>
-                <span *ngIf="!vm.puzzleSuccess" class="text-red-500 dark:text-red-400">❌ Incorrect guess. Try again!</span>
+              <div *ngIf="daily.puzzleChecked" class="text-xs font-bold text-center mt-1">
+                <span *ngIf="daily.puzzleSuccess" class="text-green-600 dark:text-green-400">🎉 Correct! The word of the day is {{ daily.dailyScrambleWord | titlecase }}.</span>
+                <span *ngIf="!daily.puzzleSuccess" class="text-red-500 dark:text-red-400">❌ Incorrect guess. Try again!</span>
               </div>
             </div>
           </div>
@@ -391,16 +391,16 @@
             </h3>
             <span class="text-label-sm font-label-sm text-primary bg-primary-container px-3 py-1 rounded-full">Today's Quests</span>
           </div>
-          <p *ngIf="vm.dailyWordChallengeError" class="text-xs text-on-surface-variant mb-2">{{ vm.dailyWordChallengeError }}</p>
-          <div *ngIf="vm.dailyWordChallengeLoading" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <p *ngIf="daily.dailyWordChallengeError" class="text-xs text-on-surface-variant mb-2">{{ daily.dailyWordChallengeError }}</p>
+          <div *ngIf="daily.dailyWordChallengeLoading" class="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div *ngFor="let _ of [1,2,3,4]" class="clay-card p-4 flex flex-col gap-2 animate-pulse">
               <div class="w-10 h-10 rounded-xl bg-surface-container-high mb-1"></div>
               <div class="h-4 bg-surface-container-high rounded w-2/3"></div>
               <div class="h-3 bg-surface-container-high rounded w-full"></div>
             </div>
           </div>
-          <div *ngIf="!vm.dailyWordChallengeLoading" class="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div *ngFor="let item of vm.dailyWordChallenge" 
+          <div *ngIf="!daily.dailyWordChallengeLoading" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div *ngFor="let item of daily.dailyWordChallenge" 
                  (click)="vm.exploreWord(item.word)"
                  class="clay-card p-4 hover:scale-[1.02] transition-all cursor-pointer group flex flex-col gap-2">
               <div class="w-10 h-10 rounded-xl bg-primary-container text-on-primary-container flex items-center justify-center mb-1">

@@ -1,10 +1,14 @@
 import { Component } from '@angular/core';
-import { TerseAppFacade } from '../../core/facades/terse-app.facade';
+import { ThemeService } from '../../core/services/theme.service';
+import { ProfileSettingsService } from '../../core/services/profile-settings.service';
 
 @Component({
   selector: 'app-profile',
   templateUrl: './profile.component.html',
 })
 export class ProfileComponent {
-  constructor(public vm: TerseAppFacade) {}
+  constructor(
+    public theme: ThemeService,
+    public profile: ProfileSettingsService
+  ) {}
 }

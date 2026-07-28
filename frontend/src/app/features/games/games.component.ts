@@ -1,16 +1,10 @@
-import { Component, OnInit } from '@angular/core';
-import { TerseAppFacade } from '../../core/facades/terse-app.facade';
+import { Component } from '@angular/core';
+import { GamesService } from './games.service';
 
 @Component({
   selector: 'app-games',
   templateUrl: './games.component.html',
 })
-export class GamesComponent implements OnInit {
-  constructor(public vm: TerseAppFacade) {}
-
-  ngOnInit(): void {
-    if (!this.vm.wordleActive && !this.vm.anagramActive) {
-      this.vm.startWordleGame();
-    }
-  }
+export class GamesComponent {
+  constructor(public vm: GamesService) {}
 }

@@ -1,14 +1,10 @@
-import { Component, OnInit } from '@angular/core';
-import { TerseAppFacade } from '../../core/facades/terse-app.facade';
+import { Component } from '@angular/core';
+import { FiltersService } from './filters.service';
 
 @Component({
   selector: 'app-filters',
   templateUrl: './filters.component.html',
 })
-export class FiltersComponent implements OnInit {
-  constructor(public vm: TerseAppFacade) {}
-
-  ngOnInit(): void {
-    this.vm.searchWords();
-  }
+export class FiltersComponent {
+  constructor(public vm: FiltersService) {}
 }

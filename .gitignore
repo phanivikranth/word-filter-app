@@ -76,6 +76,7 @@ coverage/
 *_backup.txt
 *_original_backup.txt
 backend/check_words.py
+backend/data/sample_words_definitions_old.json
 
 # Docker
 .docker/
